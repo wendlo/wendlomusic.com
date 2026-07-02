@@ -1,0 +1,16 @@
+# wget mirror of the old Squarespace site — local reference only, not part of the product
+www.wendlomusic.com/
+assets.squarespace.com/
+images.squarespace-cdn.com/
+static1.squarespace.com/
+fonts.googleapis.com/
+fonts.gstatic.com/
+use.typekit.net/
+p.typekit.net/
+
+# logs / local state
+*.log
+.DS_Store
+.vercel/
+prototype/.vercel/
+node_modules/

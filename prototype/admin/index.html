@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Wendlo Admin</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@3.7.0/dist/tabler-icons.min.css">
+<link rel="stylesheet" href="admin.css">
+<script src="../config.js"></script>
+</head>
+<body>
+
+  <!-- login gate -->
+  <div class="login" id="login">
+    <div class="login-card">
+      <img src="../assets/wendlo-logo.gif" alt="Wendlo" class="login-logo">
+      <h1>Band console</h1>
+      <p>Sign in to edit wendlomusic.com</p>
+      <form id="loginForm">
+        <input type="password" id="loginPass" placeholder="Password" autocomplete="current-password" autofocus>
+        <button type="submit">Sign in</button>
+        <div class="login-err" id="loginErr"></div>
+      </form>
+    </div>
+  </div>
+
+  <div class="app" id="app" hidden>
+    <header class="topbar">
+      <div class="brand"><img src="../assets/wendlo-logo.gif" alt=""><span>console</span></div>
+      <div class="pubstate" id="pubState"></div>
+      <div class="topbtns">
+        <button class="tbtn ghost" id="btnDiscard">Discard changes</button>
+        <button class="tbtn primary" id="btnPublish"><i class="ti ti-upload"></i> Publish</button>
+      </div>
+    </header>
+
+    <div class="body">
+      <nav class="sidebar" id="sidebar"></nav>
+
+      <main class="editor">
+        <div class="editor-head" id="editorHead"></div>
+        <div class="editor-body" id="editorBody"></div>
+      </main>
+
+      <section class="preview">
+        <div class="preview-bar">
+          <span class="pv-label">Live preview</span>
+          <div class="pv-devices" id="pvDevices">
+            <button data-pv="desktop" class="on" title="Desktop"><i class="ti ti-device-desktop"></i></button>
+            <button data-pv="mobile-p" title="Mobile portrait"><i class="ti ti-device-mobile"></i></button>
+            <button data-pv="mobile-l" title="Mobile landscape"><i class="ti ti-device-mobile-rotated"></i></button>
+          </div>
+          <a class="pv-open" href="../" target="_blank" title="Open site in a new tab"><i class="ti ti-external-link"></i></a>
+        </div>
+        <div class="preview-stage" id="pvStage">
+          <div class="pv-frame" id="pvFrame">
+            <iframe id="pvIframe" src="../?preview=1" title="Site preview"></iframe>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <div class="toasts" id="toasts"></div>
+  <div class="modal-root" id="modalRoot"></div>
+
+  <script src="core.js"></script>
+  <script src="sections/dashboard.js"></script>
+  <script src="sections/pages.js"></script>
+  <script src="sections/home.js"></script>
+  <script src="sections/about.js"></script>
+  <script src="sections/tour.js"></script>
+  <script src="sections/music.js"></script>
+  <script src="sections/store.js"></script>
+  <script src="sections/contact.js"></script>
+  <script src="sections/blog.js"></script>
+  <script src="sections/submissions.js"></script>
+  <script src="sections/design.js"></script>
+  <script src="sections/connections.js"></script>
+  <script src="sections/settings.js"></script>
+  <script>WendloStore.loadRemote().finally(()=>Admin.boot());</script>
+</body>
+</html>
