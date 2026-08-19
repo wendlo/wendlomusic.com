@@ -1,0 +1,85 @@
+/* =========================================================
+   Wendlo global shell — ported from prototype/index.html <style>.
+
+   The prototype was a demo harness with a device-toggle chrome. The real
+   site is the prototype's "fill" mode: the stage fills the viewport and the
+   desktop/mobile split is chosen by CSS media queries (NO JS autoFit). The
+   ".device.mobile X" rules from the prototype are re-homed into the two mobile
+   media queries at the bottom of rooms.css.
+   ========================================================= */
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+/* prototype body (fill mode): background ink, bone text, Montserrat, no chrome */
+body {
+  background: #0e0d0c;
+  color: var(--bone);
+  font-family: var(--nav-font);
+  min-height: 100vh;
+}
+
+/* full-viewport stage (prototype body.fill .device + .stage, chrome stripped) */
+.device {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  height: 100dvh;
+}
+
+.stage {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--ink);
+}
+
+/* announcement bar (site-wide, rendered in the root layout) */
+.annbar {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 42;
+  max-width: 88%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  background: var(--persimmon);
+  color: #2a0e06;
+  border: 0;
+  border-radius: 0 0 12px 12px;
+  padding: 8px 18px;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, .35);
+  display: none;
+}
+
+.annbar.on {
+  display: block;
+}
+
+/* screen-reader-only live region for room-change announcements */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

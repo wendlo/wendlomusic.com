@@ -1,0 +1,22 @@
+/*
+ * Design tokens — ported VERBATIM from prototype/index.html :root.
+ *
+ * FONTS: the prototype loads ONLY "Montserrat" (nav/body) and "Caveat" (hand).
+ * The real site swaps Montserrat → Proxima Nova, but here we keep the exact
+ * prototype stack. next/font injects --font-montserrat / --font-caveat; we
+ * alias --nav-font / --hand to those with the same fallbacks the prototype used.
+ */
+
+:root {
+  --bone: #F4EFE6;
+  --ink: #1A1714;
+  --persimmon: #E0A32B;
+  --butter: #F2C14E;
+
+  /* prototype: --nav-font:"Montserrat",system-ui,sans-serif  (real site: Proxima Nova) */
+  --nav-font: var(--font-montserrat), system-ui, sans-serif;
+  --hand: var(--font-caveat), cursive;
+
+  --stripes: url("/defaults/stripes.jpg");
+  --ease: cubic-bezier(.72, 0, .18, 1);
+}

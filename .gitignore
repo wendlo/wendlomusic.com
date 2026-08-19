@@ -8,6 +8,9 @@ fonts.gstatic.com/
 use.typekit.net/
 p.typekit.net/
 
+# working files / heavy binaries — not part of the product
+*.psd
+
 # logs / local state
 *.log
 .DS_Store
