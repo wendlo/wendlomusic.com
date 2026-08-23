@@ -30,6 +30,7 @@ import {
   type ReactNode,
 } from 'react';
 import type { DesignSettings, NavPage, PageId } from '@/lib/content/types';
+import { DEFAULT_ASSETS } from '@/lib/content/fallback';
 
 /** Pages whose nav dock is the vertical side dock (prototype SIDE_PAGES). */
 const SIDE_PAGES: ReadonlySet<PageId> = new Set<PageId>(['music', 'store', 'blog']);
@@ -223,10 +224,17 @@ export function Shell({ pages, design, children }: ShellProps) {
   return (
     <div className="device">
       <div ref={stageRef} className={stageClass}>
-        {/* logo — floats over the whole stage; only visible/at-home via CSS */}
+        {/* logo — floats over the whole stage; only visible/at-home via CSS.
+            The built-in brand GIF is black art that CSS inverts to white;
+            a band-uploaded logo is `custom` and shown as-is (prototype:
+            `logo.classList.toggle('custom', !!CFG.design.logo)`). */}
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img
-          className={design.logo.url ? 'logo custom' : 'logo'}
+          className={
+            design.logo.url && design.logo.url !== DEFAULT_ASSETS.logo
+              ? 'logo custom'
+              : 'logo'
+          }
           src={design.logo.url}
           alt="Wendlo"
           data-go="home"
