@@ -11,10 +11,38 @@
  * §6.1. It is intentionally left raw here since it is unused until then.
  */
 
-/** Read a public var, returning undefined when unset/empty. */
+/**
+ * Read a public var, returning undefined when unset/empty.
+ *
+ * Hardened against dashboard paste mistakes: surrounding quotes and stray
+ * whitespace are stripped (a value pasted as `"abc123"` into Vercel would
+ * otherwise reach `createClient()` verbatim and throw at import, which takes
+ * the whole build down at "Collecting page data").
+ */
 function pub(value: string | undefined): string | undefined {
-  const v = value?.trim();
+  const v = value?.trim().replace(/^['"]+|['"]+$/g, '').trim();
   return v ? v : undefined;
+}
+
+/**
+ * Sanity project ids / dataset names may only contain a-z, 0-9 and dashes.
+ * Anything else is treated as "not configured" (with a loud build-log warning)
+ * rather than letting `@sanity/client` throw at module evaluation.
+ */
+export function sanityId(
+  name: string,
+  value: string | undefined,
+): string | undefined {
+  const v = pub(value)?.toLowerCase();
+  if (!v) return undefined;
+  if (!/^[a-z0-9-]+$/.test(v)) {
+    console.warn(
+      `[env] ${name}="${value}" is not a valid Sanity id (a-z, 0-9, dashes only) — ` +
+        'ignoring it and falling back to baked content. Fix the value in Vercel → Settings → Environment Variables.',
+    );
+    return undefined;
+  }
+  return v;
 }
 
 export interface SanityEnv {
@@ -44,8 +72,8 @@ export interface PublicEnv {
 /** Public (browser-safe) environment. */
 export const env: PublicEnv = {
   sanity: {
-    projectId: pub(process.env.NEXT_PUBLIC_SANITY_PROJECT_ID),
-    dataset: pub(process.env.NEXT_PUBLIC_SANITY_DATASET),
+    projectId: sanityId('NEXT_PUBLIC_SANITY_PROJECT_ID', process.env.NEXT_PUBLIC_SANITY_PROJECT_ID),
+    dataset: sanityId('NEXT_PUBLIC_SANITY_DATASET', process.env.NEXT_PUBLIC_SANITY_DATASET),
     apiVersion: pub(process.env.NEXT_PUBLIC_SANITY_API_VERSION),
   },
   shopify: {

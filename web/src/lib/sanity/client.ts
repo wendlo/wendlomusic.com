@@ -23,8 +23,10 @@ export const SANITY_PROJECT_ID = env.sanity.projectId;
  * The shared read client, or `null` when no project id is configured. Callers
  * MUST null-check (see `getClient`) so the fallback content path stays intact.
  */
-export const client: SanityClient | null = SANITY_PROJECT_ID
-  ? createClient({
+function buildClient(): SanityClient | null {
+  if (!SANITY_PROJECT_ID) return null;
+  try {
+    return createClient({
       projectId: SANITY_PROJECT_ID,
       dataset: SANITY_DATASET,
       apiVersion: SANITY_API_VERSION,
@@ -33,8 +35,19 @@ export const client: SanityClient | null = SANITY_PROJECT_ID
       // Optional read token (private datasets); harmless when undefined.
       token: serverEnv().sanityReadToken,
       perspective: 'published',
-    })
-  : null;
+    });
+  } catch (err) {
+    // A bad env value must NEVER take the build down at module evaluation —
+    // degrade to the baked-content path and say so loudly in the build log.
+    console.warn(
+      '[sanity] could not construct the read client — falling back to baked content:',
+      err instanceof Error ? err.message : err,
+    );
+    return null;
+  }
+}
+
+export const client: SanityClient | null = buildClient();
 
 /**
  * Guarded accessor: returns the configured client, or `null` when Sanity is not

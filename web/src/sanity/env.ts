@@ -10,9 +10,18 @@
  * route, both of which check `isSanityConfigured` before doing anything live.
  */
 
-/** The raw project id from env, or undefined when unset/empty. */
-export const projectId =
-  process.env.NEXT_PUBLIC_SANITY_PROJECT_ID?.trim() || undefined;
+/**
+ * Strip wrapping quotes/whitespace (dashboard paste mistakes) and accept only
+ * Sanity's legal id charset; anything else counts as "not configured" so the
+ * Studio config can never throw at import over a mangled env value.
+ */
+function cleanId(raw: string | undefined): string | undefined {
+  const v = raw?.trim().replace(/^['"]+|['"]+$/g, '').trim().toLowerCase();
+  return v && /^[a-z0-9-]+$/.test(v) ? v : undefined;
+}
+
+/** The project id from env, or undefined when unset/empty/invalid. */
+export const projectId = cleanId(process.env.NEXT_PUBLIC_SANITY_PROJECT_ID);
 
 /** True only when a real Sanity project id is present. */
 export const isSanityConfigured = Boolean(projectId);
@@ -26,7 +35,7 @@ export const isSanityConfigured = Boolean(projectId);
 export const safeProjectId = projectId ?? 'placeholder';
 
 export const dataset =
-  process.env.NEXT_PUBLIC_SANITY_DATASET?.trim() || 'production';
+  cleanId(process.env.NEXT_PUBLIC_SANITY_DATASET) ?? 'production';
 
 export const apiVersion =
   process.env.NEXT_PUBLIC_SANITY_API_VERSION?.trim() || '2024-10-01';
