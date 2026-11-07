@@ -130,6 +130,11 @@ export interface ContactIslandProps {
    * server-side (lib/contactEmail) so it is never a bouncing mailbox.
    */
   fallbackEmail: string;
+  /**
+   * Turnstile site key read on the server at render time (lib/env). Wins over
+   * the build-time inlined value, which a cached rebuild can leave empty.
+   */
+  turnstileSiteKey?: string;
 }
 
 /** Quiet consent copy under each form's submit button. */
@@ -138,7 +143,12 @@ const FORM_NOTES: Record<'message' | 'email', string> = {
   message: "We'll only use this to reply to you.",
 };
 
-export function ContactIsland({ contact, fallbackEmail }: ContactIslandProps) {
+export function ContactIsland({
+  contact,
+  fallbackEmail,
+  turnstileSiteKey,
+}: ContactIslandProps) {
+  const siteKey = turnstileSiteKey || TURNSTILE_SITE_KEY;
   const [sheet, setSheet] = useState<SheetKind | null>(null);
   const [form, setForm] = useState<FormState>({
     values: {},
@@ -181,14 +191,14 @@ export function ContactIsland({ contact, fallbackEmail }: ContactIslandProps) {
 
   // Lazily load + render the Turnstile widget when a form sheet opens.
   useEffect(() => {
-    if (!TURNSTILE_SITE_KEY || !formSheetOpen) return;
+    if (!siteKey || !formSheetOpen) return;
     let cancelled = false;
     tokenRef.current = '';
     loadTurnstile()
       .then(() => {
         if (cancelled || !widgetHostRef.current || !window.turnstile) return;
         widgetIdRef.current = window.turnstile.render(widgetHostRef.current, {
-          sitekey: TURNSTILE_SITE_KEY,
+          sitekey: siteKey,
           callback: (token) => {
             tokenRef.current = token;
           },
@@ -216,7 +226,7 @@ export function ContactIsland({ contact, fallbackEmail }: ContactIslandProps) {
       widgetIdRef.current = null;
       tokenRef.current = '';
     };
-  }, [formSheetOpen, sheet]);
+  }, [formSheetOpen, sheet, siteKey]);
 
   const onSubmit = useCallback(
     async (e: React.FormEvent<HTMLFormElement>) => {
@@ -441,7 +451,7 @@ export function ContactIsland({ contact, fallbackEmail }: ContactIslandProps) {
                       onChange={(e) => setHoneypot(e.target.value)}
                     />
                   </div>
-                  {TURNSTILE_SITE_KEY ? (
+                  {siteKey ? (
                     <div
                       ref={widgetHostRef}
                       style={{ marginTop: 14 }}

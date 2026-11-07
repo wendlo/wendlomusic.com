@@ -17,6 +17,7 @@
 
 import type { ContactPage } from '@/lib/content/types';
 import { resolveReachableEmail } from '@/lib/contactEmail';
+import { turnstileSiteKey } from '@/lib/env';
 import { ContactIsland } from './_client/ContactIsland';
 
 export interface ContactRoomProps {
@@ -34,7 +35,11 @@ export async function ContactRoom({ contact }: ContactRoomProps) {
         src={contact.polaroids.url}
         alt="Wendlo polaroids"
       />
-      <ContactIsland contact={contact} fallbackEmail={fallbackEmail} />
+      <ContactIsland
+        contact={contact}
+        fallbackEmail={fallbackEmail}
+        turnstileSiteKey={turnstileSiteKey()}
+      />
     </section>
   );
 }

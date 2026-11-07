@@ -130,6 +130,17 @@ function numericId(name: string, value: string | undefined): string | undefined 
   return v;
 }
 
+/**
+ * The PUBLIC Turnstile site key, read on the server when the page renders
+ * (build / ISR) and handed to the form as a prop. The computed name stops
+ * Next from inlining it at build time, so a redeploy that reuses a cached
+ * client build still picks up a key added in Vercel afterwards.
+ */
+export function turnstileSiteKey(): string | undefined {
+  const name = ['NEXT_PUBLIC', 'TURNSTILE', 'SITE', 'KEY'].join('_');
+  return pub(process.env[name]);
+}
+
 /** Read the server secrets. Call only in server code (routes / RSC). */
 export function serverEnv(): ServerEnv {
   return {
