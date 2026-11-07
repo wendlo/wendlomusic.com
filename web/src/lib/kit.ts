@@ -3,25 +3,32 @@
  *
  * Server-only. Never import from client components (it handles the API key).
  *
+ * SINGLE opt-in: a fan who submits the website form is on the list at once
+ * ("Confirmed" in Kit) and Kit sends them nothing at signup.
+ *
  * Flow per email-list signup (developers.kit.com/api-reference):
  *   0. resolveFormId — KIT_FORM_ID if set; otherwise GET /v4/forms?status=active
  *      once per server instance and pick the form named "Website signups"
- *      (or the only active form). Cached on success only. If no form can be
- *      determined the signup is NOT sent to Kit (it's still in the Sheet).
+ *      (or the only active form). Cached on success only. No form found →
+ *      the fan is still created (step 2), just not added to a form (step 3).
  *   1. ensureKitFields — POST /v4/custom_fields {label} for "Location" and
  *      "Best meal" (idempotent: 201 created / 200 already exists), once per
  *      server instance, cached on success only. Failure is NON-fatal: the
  *      subscriber is created without custom fields (the values are in Sheets).
- *   2. POST /v4/subscribers { email_address, first_name, state:"inactive",
- *      fields } — an upsert. `state:"inactive"` is CRITICAL: the API default is
- *      "active", which would bypass double opt-in. "inactive" is what the Kit
- *      UI calls "Unconfirmed". An existing subscriber's state is never changed
- *      by this endpoint (active stays active, cancelled stays cancelled).
+ *   2. POST /v4/subscribers { email_address, first_name, state:"active",
+ *      fields } — an upsert. 201 = new subscriber, on the list now. 200 = the
+ *      address already existed: Kit never changes an existing subscriber's
+ *      state here (active stays active; unsubscribed "cancelled" and
+ *      unconfirmed "inactive" stay so) but it DOES overwrite first_name and
+ *      fields, so blank values are never sent.
  *   3. POST /v4/forms/{formId}/subscribers/{id} { referrer } — adds them to
- *      the double-opt-in form, which makes Kit send the form's confirmation
- *      email (201 = newly added; 200 = already on the form, nothing re-sent).
- *
- * Kit success = steps 2 AND 3 returned 2xx.
+ *      the "Website signups" form (201 = newly added; 200 = already on it).
+ *      That form must have "Send confirmation email" UNticked: then Kit sends
+ *      nothing, and joining it is what brings back a returning fan who had
+ *      unsubscribed or never confirmed. If the box is ticked, Kit emails the
+ *      form's confirmation email to people joining it for the first time —
+ *      they were created active, so they're on the list either way. A 422
+ *      here (form archived/deleted) is logged; a new fan is still on the list.
  */
 
 import type { ServerEnv } from '@/lib/env';
@@ -36,7 +43,7 @@ export const KIT_FIELD_LABELS = { location: 'Location', meal: 'Best meal' } as c
 type SiteField = keyof typeof KIT_FIELD_LABELS;
 type FieldKeys = Record<SiteField, string>;
 
-/** The name the band gives the double-opt-in form (band guide, step 3). */
+/** The name the band gives the signup form (band guide, step 3). */
 export const KIT_FORM_NAME = 'Website signups';
 
 export interface KitConfig {
@@ -56,16 +63,37 @@ export function kitConfig(env: ServerEnv): KitConfig | null {
 
 /**
  * What happened, for the Sheet's "Mailing list" column and logs.
- *  - confirmation_sent  — on the form and Unconfirmed: Kit sent (now, or on
- *                         their first signup) the confirmation email.
- *  - already_subscribed — Kit says they're already an active subscriber.
- *  - not_added          — Kit error/timeout, or Kit kept them off the list
- *                         (e.g. they previously unsubscribed: state cancelled).
+ *  - added              — on the list now: new, or a returning fan whom
+ *                         joining the form brought back.
+ *  - added_no_form      — on the list now, but not on the "Website signups"
+ *                         form (it couldn't be found, or refused them).
+ *  - already_subscribed — they were already on the list.
+ *  - unconfirmed        — they joined the form but Kit still has them as
+ *                         Unconfirmed, i.e. the form's "Send confirmation
+ *                         email" is still ticked.
+ *  - unsubscribed       — they joined the form but Kit still keeps them off
+ *                         the list (bounced, complained, or Kit refused).
+ *  - form_failed        — a returning fan (unsubscribed / unconfirmed) whom
+ *                         only joining the form could bring back, and that
+ *                         step was skipped or failed: NOT on the list.
+ *  - not_added          — Kit error/timeout before they were created.
+ * 'unconfirmed' / 'unsubscribed' are only reported from the state the form
+ * step read back — never from the create call's (unchanged) old state.
  */
-export type KitOutcome = 'confirmation_sent' | 'already_subscribed' | 'not_added';
+export type KitOutcome =
+  | 'added'
+  | 'added_no_form'
+  | 'already_subscribed'
+  | 'unconfirmed'
+  | 'unsubscribed'
+  | 'form_failed'
+  | 'not_added';
 
 export interface KitResult {
-  /** Both Kit calls returned 2xx (drives the "Kit is the only backend" 502). */
+  /**
+   * Kit took this signup (or definitively answered for it). false drives the
+   * "Kit is the only backend" 502 so the fan sees an error and can retry.
+   */
   ok: boolean;
   outcome: KitOutcome;
 }
@@ -222,7 +250,7 @@ export function resetKitFieldCache(): void {
 }
 
 /* ------------------------------------------------------------------ *
- * Steps 2 + 3 — upsert as inactive, then add to the double-opt-in form
+ * Steps 2 + 3 — upsert as active, then add to the signup form
  * ------------------------------------------------------------------ */
 
 export interface KitSignup {
@@ -242,10 +270,8 @@ export async function kitSubscribe(
 ): Promise<KitResult> {
   const failed: KitResult = { ok: false, outcome: 'not_added' };
   try {
-    /* 0. which form — without one there's no confirmation email, so don't
-          create a subscriber that would sit unconfirmed with nothing sent */
+    /* 0. which form — null still subscribes them, just without the form */
     const formId = await resolveFormId(cfg, call);
-    if (!formId) return failed;
 
     /* 1. custom fields — only needed when there's something to store */
     let fields: Record<string, string> | undefined;
@@ -258,14 +284,14 @@ export async function kitSubscribe(
       }
     }
 
-    /* 2. create / upsert the subscriber as UNCONFIRMED */
+    /* 2. create / upsert the subscriber as ACTIVE (single opt-in) */
     const created = await call(`${KIT_API}/subscribers`, {
       method: 'POST',
       headers: headers(cfg.apiKey),
       body: JSON.stringify({
         email_address: signup.email,
         first_name: signup.name || undefined,
-        state: 'inactive',
+        state: 'active',
         fields,
       }),
     });
@@ -273,39 +299,71 @@ export async function kitSubscribe(
       await logKitError('create subscriber', created);
       return failed;
     }
+    // 201 (or 202: custom fields added asynchronously) = a brand-new subscriber.
+    const isNew = created.status === 201 || created.status === 202;
     const sub = ((await created.json()) as { subscriber?: KitSubscriber }).subscriber;
     if (typeof sub?.id !== 'number') {
       console.error('[kit] create subscriber: response had no subscriber id');
       return failed;
     }
+    const before = sub.state ?? (isNew ? 'active' : undefined);
 
-    /* 3. add to the form (this is what sends the confirmation email) */
-    const added = await call(
-      `${KIT_API}/forms/${encodeURIComponent(formId)}/subscribers/${sub.id}`,
-      {
-        method: 'POST',
-        headers: headers(cfg.apiKey),
-        body: JSON.stringify({ referrer: signup.referrer ?? null }),
-      },
-    );
-    if (!added.ok) {
-      await logKitError(`add subscriber to form ${formId}`, added);
-      return failed;
-    }
-    let state = sub.state;
-    try {
-      const onForm = ((await added.json()) as { subscriber?: KitSubscriber }).subscriber;
-      if (typeof onForm?.state === 'string') state = onForm.state;
-    } catch {
-      // 2xx with an unreadable body — fall back to the create response's state
+    /* 3. add to the form — attribution, and brings back a returning fan */
+    let state = before;
+    let onForm = false;
+    let stateFromForm = false;
+    if (formId) {
+      try {
+        const added = await call(
+          `${KIT_API}/forms/${encodeURIComponent(formId)}/subscribers/${sub.id}`,
+          {
+            method: 'POST',
+            headers: headers(cfg.apiKey),
+            body: JSON.stringify({ referrer: signup.referrer ?? null }),
+          },
+        );
+        if (added.ok) {
+          onForm = true;
+          try {
+            const joined = ((await added.json()) as { subscriber?: KitSubscriber }).subscriber;
+            if (typeof joined?.state === 'string') {
+              state = joined.state;
+              stateFromForm = true;
+            }
+          } catch {
+            // 2xx with an unreadable body — keep the create response's state
+          }
+        } else {
+          await logKitError(`add subscriber to form ${formId}`, added);
+          // A looked-up form that's gone (archived / re-created): look it up
+          // again on the next signup instead of reusing the stale id.
+          if (!cfg.formId && (added.status === 404 || added.status === 422)) {
+            formCache.delete(cfg.apiKey);
+          }
+        }
+      } catch (err) {
+        // The subscriber already exists; only the form step was lost.
+        console.error(`[kit] add subscriber to form ${formId} failed: ${errMessage(err)}`);
+      }
     }
 
-    if (state === 'active') return { ok: true, outcome: 'already_subscribed' };
-    if (state === 'inactive') return { ok: true, outcome: 'confirmation_sent' };
-    // cancelled / bounced / complained: Kit keeps them off the list and the API
-    // can't change that (re-subscribing needs their consent via Kit itself).
-    console.warn(`[kit] subscriber ${sub.id} is "${state ?? 'unknown'}" — not on the list`);
-    return { ok: true, outcome: 'not_added' };
+    if (state === 'active') {
+      if (!isNew && before === 'active') return { ok: true, outcome: 'already_subscribed' };
+      return { ok: true, outcome: onForm ? 'added' : 'added_no_form' };
+    }
+    if (!stateFromForm) {
+      // A returning fan who isn't active (unsubscribed / unconfirmed): Kit
+      // never changes that state in step 2, and the form join that could
+      // have brought them back didn't happen or didn't report back.
+      console.error(
+        `[kit] subscriber ${sub.id} is "${state ?? 'unknown'}" and the form step didn't complete — not on the list`,
+      );
+      return { ok: false, outcome: 'form_failed' };
+    }
+    if (state === 'inactive') return { ok: true, outcome: 'unconfirmed' };
+    // bounced / complained / cancelled even after joining: Kit keeps them off.
+    console.warn(`[kit] subscriber ${sub.id} is "${state}" after joining the form — not on the list`);
+    return { ok: true, outcome: 'unsubscribed' };
   } catch (err) {
     // network error, timeout/abort, or budget exhausted
     console.error(`[kit] signup failed: ${errMessage(err)}`);

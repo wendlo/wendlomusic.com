@@ -7,7 +7,8 @@
  *                              tabs for messages and sign-ups; sign-ups get a
  *                              "Mailing list" status column, values in
  *                              sheets.ts MAILING_LIST_STATUS], Kit (src/lib/kit.ts)
- *                              state 'inactive' + double-opt-in form [email
+ *                              state 'active' (single opt-in) + "Website
+ *                              signups" form [email
  *                              list only; name, email, location, meal, signup
  *                              page URL (Referer) — never the message], Resend
  *                              notify [+ the same mailing-list status line],
@@ -88,9 +89,10 @@ export default async function PrivacyPage() {
               address, briefly, to keep out spam.
             </li>
             <li>
-              The email list is opt-in twice: you’ll get a confirmation email
-              first, we can’t email you until you click the link in it, and
-              every email has an unsubscribe link.
+              We only add people to the email list through our sign-up form,
+              and every email has an unsubscribe link. Getting our emails
+              without having signed up? Unsubscribe, or email us and we’ll
+              delete your address.
             </li>
             <li>No analytics, no ad trackers, and we don’t sell your data.</li>
             <li>
@@ -127,10 +129,10 @@ export default async function PrivacyPage() {
             you about shows nearby. The meal question is just for fun.
           </p>
           <p>
-            <strong>Why we’re allowed to:</strong> your consent. We only start
-            sending you emails once you’ve confirmed by clicking the link in the
-            confirmation email, and you can withdraw consent any time by
-            unsubscribing or emailing us.
+            <strong>Why we’re allowed to:</strong> your consent. You join the
+            list by sending the sign-up form, and we keep a record of when you
+            did. You can withdraw consent any time by unsubscribing or emailing
+            us.
           </p>
 
           <h3>Sending us a message</h3>
@@ -197,9 +199,9 @@ export default async function PrivacyPage() {
               own private spreadsheet. Messages and email-list sign-ups go on
               separate tabs, and each row holds the date and time and everything
               you filled in. Sign-up rows also have a “Mailing list” column
-              where our server notes what happened with your sign-up: that your
-              confirmation email was sent, that you were already on the list, or
-              that you weren’t added. Nothing else about you is added. Our email
+              where our server notes what happened with your sign-up — for
+              example, that you were added to the list, that you were already on
+              it, or that you weren’t added. Nothing else about you is added. Our email
               inbox is Gmail, so emails you send us — and the notification
               emails described below — are stored there.
             </dd>
@@ -209,11 +211,9 @@ export default async function PrivacyPage() {
               Runs the email list — <em>email-list sign-ups only</em>. It gets
               your email address, name, and — if you told us — where you live
               and your best meal (never your message), plus the web address of
-              the page you signed up on. It sends the confirmation
-              email; until you click the link in it you’re held as an
-              unconfirmed sign-up and won’t get our emails. After that it sends
-              our newsletters. Kit is based in the US and acts as our processor
-              under its data processing agreement.
+              the page you signed up on. You’re on the list as soon as you
+              sign up, and Kit sends our newsletters. Kit is based in the US and
+              acts as our processor under its data processing agreement.
             </dd>
 
             <dt>Resend</dt>
@@ -336,10 +336,9 @@ export default async function PrivacyPage() {
               delete it. If you unsubscribe, Kit keeps your subscriber record
               (your address, the details above and a history of the emails we
               sent you) marked as unsubscribed so you aren’t emailed again — ask
-              us if you’d rather it was deleted completely. If you never click
-              the confirmation link, your sign-up may stay in Kit as
-              unconfirmed (we can’t email you) until we delete it — just ask.
-              Unsubscribing doesn’t remove your sign-up row from our Google
+              us if you’d rather it was deleted completely. Signing up again
+              through our form puts you back on the list. Unsubscribing
+              doesn’t remove your sign-up row from our Google
               Sheet; that stays until you ask us to delete it.
             </li>
             <li>

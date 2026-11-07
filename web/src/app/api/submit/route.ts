@@ -11,10 +11,10 @@
  *   d. Google Sheets append (src/lib/sheets.ts) — contacts go to the
  *      "Messages" tab, signups to "Email signups" (tabs + headers created on
  *      first use). RECORD OF TRUTH: configured + fails → 502.
- *   e. Kit signup (src/lib/kit.ts, email kind only): upsert the subscriber as
- *      UNCONFIRMED and add them to the double-opt-in form, which sends Kit's
- *      confirmation email. Skipped when Kit env is unset. Then the signup
- *      row's "Mailing list" cell is filled in (best-effort).
+ *   e. Kit signup (src/lib/kit.ts, email kind only): single opt-in — upsert
+ *      the subscriber as ACTIVE (on the list at once, no email) and add them
+ *      to the "Website signups" form. Skipped when Kit env is unset. Then the
+ *      signup row's "Mailing list" cell is filled in (best-effort).
  *   f. Notify email via Resend — best-effort, never fails the request.
  *
  * DEGRADE RULE: when NO storage backend applies to this submission (no Sheets,

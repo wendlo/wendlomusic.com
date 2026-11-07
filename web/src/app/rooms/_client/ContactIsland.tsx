@@ -134,7 +134,7 @@ export interface ContactIslandProps {
 
 /** Quiet consent copy under each form's submit button. */
 const FORM_NOTES: Record<'message' | 'email', string> = {
-  email: "You'll get a confirmation email first. Unsubscribe anytime.",
+  email: "You're joining Wendlo's email list. Unsubscribe anytime.",
   message: "We'll only use this to reply to you.",
 };
 

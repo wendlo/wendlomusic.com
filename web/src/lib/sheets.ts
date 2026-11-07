@@ -96,10 +96,14 @@ export const TABS: Record<SubmissionKind, TabSpec> = {
 /** "Mailing list" is this many columns right of the row's first cell (6 → "G"). */
 const MAILING_LIST_OFFSET = TABS.email.header.length - 1;
 
-/** The four values the "Mailing list" cell can hold. */
+/** The values the "Mailing list" cell can hold (one per Kit outcome). */
 export const MAILING_LIST_STATUS = {
-  confirmation_sent: 'Confirmation email sent',
+  added: 'Added',
+  added_no_form: 'Added (not on the Website signups form)',
   already_subscribed: 'Already subscribed',
+  unconfirmed: "Unconfirmed in Kit — the form's confirmation email is still on",
+  unsubscribed: 'Not added — Kit has them as unsubscribed or bounced',
+  form_failed: "Not added — Kit couldn't add them to the Website signups form",
   not_added: 'Not added — add by hand in Kit',
   not_connected: 'Kit not connected yet',
 } as const;

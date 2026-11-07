@@ -122,7 +122,7 @@ function numericId(name: string, value: string | undefined): string | undefined 
   if (!v) return undefined;
   if (!/^\d+$/.test(v)) {
     console.warn(
-      `[env] ${name} is not a number — ignoring it (the integration is skipped). ` +
+      `[env] ${name} is not a number — ignoring it (the form is looked up by name instead). ` +
         'Fix the value in Vercel → Settings → Environment Variables.',
     );
     return undefined;
