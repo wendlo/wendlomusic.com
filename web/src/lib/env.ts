@@ -131,14 +131,24 @@ function numericId(name: string, value: string | undefined): string | undefined 
 }
 
 /**
- * The PUBLIC Turnstile site key, read on the server when the page renders
- * (build / ISR) and handed to the form as a prop. The computed name stops
- * Next from inlining it at build time, so a redeploy that reuses a cached
- * client build still picks up a key added in Vercel afterwards.
+ * Wendlo's Cloudflare Turnstile widget — the PUBLIC site key (it ships to every
+ * visitor's browser). Used whenever TURNSTILE_SECRET_KEY is set but no site key
+ * is, so the server never demands a token the form can't produce. If the widget
+ * is ever replaced in Cloudflare, set BOTH new keys in Vercel.
+ */
+export const DEFAULT_TURNSTILE_SITE_KEY = '0x4AAAAAAF3zz7BZE7FRxDLQ';
+
+/**
+ * The Turnstile site key for the form, read on the server when the page
+ * renders (build / ISR) and handed to the form as a prop. The computed name
+ * stops Next from inlining it at build time.
  */
 export function turnstileSiteKey(): string | undefined {
   const name = ['NEXT_PUBLIC', 'TURNSTILE', 'SITE', 'KEY'].join('_');
-  return pub(process.env[name]);
+  return (
+    pub(process.env[name]) ??
+    (pub(process.env.TURNSTILE_SECRET_KEY) ? DEFAULT_TURNSTILE_SITE_KEY : undefined)
+  );
 }
 
 /** Read the server secrets. Call only in server code (routes / RSC). */
