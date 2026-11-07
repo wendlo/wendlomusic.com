@@ -206,6 +206,13 @@ export default async function PrivacyPage() {
               emails described below — are stored there.
             </dd>
 
+            <dt>ImprovMX</dt>
+            <dd>
+              Forwards email sent to our @wendlomusic.com addresses (like the
+              one on this page) to our Gmail inbox, and keeps a short log of
+              the emails it has forwarded.
+            </dd>
+
             <dt>Kit (Kit, Inc., US)</dt>
             <dd>
               Runs the email list — <em>email-list sign-ups only</em>. It gets
