@@ -1,0 +1,244 @@
+/* =========================================================
+   /privacy — plain reading page in the Wendlo palette.
+   Scoped under .pv so nothing leaks into the rooms. Reuses tokens.css only:
+   bone ground, ink text, Montserrat (--nav-font), mustard (--persimmon)
+   accents, butter highlight, Caveat (--hand) sign-off like the form success.
+   ========================================================= */
+
+/* the global body is near-black for the stage; this page reads on bone */
+body:has(.pv) {
+  background: var(--bone);
+  color: var(--ink);
+}
+
+.pv {
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--bone);
+  color: var(--ink);
+  font-family: var(--nav-font);
+  padding: 0 16px 72px;
+}
+
+/* ---- top bar: logo home + back link ---- */
+.pv-top {
+  max-width: 65ch;
+  margin: 0 auto;
+  /* clears the site-wide announcement bar when it is on */
+  padding: 52px 0 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.pv-logo {
+  display: block;
+  line-height: 0;
+  transition: transform .25s var(--ease);
+}
+
+.pv-logo:hover {
+  transform: translateY(-2px);
+}
+
+/* the gif has wide transparent margins — crop to the lettering */
+.pv-logo img {
+  display: block;
+  height: clamp(46px, 6.4vw, 64px);
+  width: auto;
+  aspect-ratio: 1400 / 441;
+  object-fit: cover;
+  object-position: 50% 50%;
+}
+
+.pv-back {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: .02em;
+  color: var(--ink);
+  text-decoration: none;
+  white-space: nowrap;
+  border-bottom: 2px solid var(--persimmon);
+  padding-bottom: 2px;
+  transition: color .2s, border-color .2s;
+}
+
+.pv-back:hover {
+  border-color: var(--ink);
+}
+
+/* ---- document ---- */
+.pv-doc {
+  max-width: 65ch;
+  margin: 0 auto;
+  font-size: 16px;
+  line-height: 1.7;
+}
+
+.pv-date {
+  margin-top: 40px;
+  font-size: 12px;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+  color: #6c645c;
+}
+
+.pv-doc h1 {
+  font-weight: 800;
+  font-size: clamp(40px, 9vw, 72px);
+  line-height: .95;
+  letter-spacing: -.02em;
+  text-transform: lowercase;
+  margin: 6px 0 28px;
+}
+
+.pv-doc h1::after {
+  content: "";
+  display: block;
+  width: 64px;
+  height: 6px;
+  margin-top: 18px;
+  border-radius: 3px;
+  background: var(--persimmon);
+}
+
+.pv-doc h2 {
+  font-weight: 700;
+  font-size: clamp(22px, 4.2vw, 28px);
+  line-height: 1.2;
+  margin: 0 0 12px;
+}
+
+.pv-doc h3 {
+  font-weight: 700;
+  font-size: 15px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  margin: 26px 0 6px;
+}
+
+.pv-doc section {
+  padding-top: 36px;
+  margin-top: 36px;
+  border-top: 1px solid rgba(26, 23, 20, .14);
+}
+
+.pv-doc p + p {
+  margin-top: 12px;
+}
+
+.pv-doc ul {
+  margin: 10px 0 0;
+  padding-left: 1.2em;
+}
+
+.pv-doc li + li {
+  margin-top: 8px;
+}
+
+.pv-doc li::marker {
+  color: var(--persimmon);
+}
+
+.pv-doc strong {
+  font-weight: 700;
+}
+
+/* links: ink text, mustard underline (mustard text alone fails contrast on bone) */
+.pv-doc a:not(.pv-back) {
+  color: var(--ink);
+  font-weight: 600;
+  text-decoration: underline;
+  text-decoration-color: var(--persimmon);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+  transition: background-color .2s;
+}
+
+.pv-doc a:not(.pv-back):hover {
+  background: var(--butter);
+}
+
+/* ---- "the short version" card ---- */
+.pv-short {
+  background: #fff;
+  border: 1px solid #d8cdbb;
+  border-left: 6px solid var(--persimmon);
+  border-radius: 18px;
+  padding: 22px 24px 18px;
+  box-shadow: 0 12px 32px rgba(26, 23, 20, .08);
+}
+
+.pv-short h2 {
+  font-size: 15px;
+  letter-spacing: .04em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+
+.pv-short ul {
+  margin-top: 6px;
+}
+
+.pv-sign {
+  font-family: var(--hand);
+  font-size: 26px;
+  line-height: 1;
+  text-align: right;
+  margin-top: 10px;
+  color: #6c645c;
+}
+
+/* ---- processor list ---- */
+.pv-list {
+  margin: 16px 0 18px;
+  display: grid;
+  grid-template-columns: minmax(0, 11em) minmax(0, 1fr);
+  column-gap: 20px;
+}
+
+.pv-list dt {
+  font-weight: 700;
+  padding: 12px 0;
+  border-top: 1px solid rgba(26, 23, 20, .1);
+}
+
+.pv-list dd {
+  margin: 0;
+  padding: 12px 0;
+  border-top: 1px solid rgba(26, 23, 20, .1);
+}
+
+.pv-foot {
+  margin-top: 48px;
+}
+
+@media (max-width: 560px) {
+  .pv-doc {
+    font-size: 15.5px;
+  }
+
+  .pv-top {
+    padding-top: 44px;
+  }
+
+  .pv-back {
+    font-size: 12px;
+  }
+
+  .pv-short {
+    padding: 18px 18px 14px;
+  }
+
+  /* stack the processor list on phones */
+  .pv-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pv-list dd {
+    border-top: 0;
+    padding-top: 0;
+  }
+}

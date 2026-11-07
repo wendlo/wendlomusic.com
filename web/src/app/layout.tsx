@@ -58,10 +58,12 @@ const caveat = localFont({
 
 export async function generateMetadata(): Promise<Metadata> {
   const { settings } = await getSiteContent();
-  const siteUrl =
-    process.env.NEXT_PUBLIC_SITE_URL || 'https://www.wendlomusic.com';
   return {
-    metadataBase: new URL(siteUrl),
+    // Apex is the canonical host (www 307-redirects to it), so relative
+    // og:image / icon URLs must resolve against the apex with no redirect hop.
+    // Hardcoded on purpose: a missing or malformed env value can't break the
+    // build or point crawlers at www.
+    metadataBase: new URL('https://wendlomusic.com'),
     title: settings.title || 'Wendlo',
     description: settings.description || '',
     icons: { icon: '/w-tile.png' },

@@ -2103,3 +2103,34 @@
     animation: none;
   }
 }
+
+/* ---------- privacy / consent (additive, pre-launch) ---------- */
+/* quiet Privacy link under the contact card's email lines */
+.cprivacy {
+  margin-top: 6px;
+  font-size: 11px;
+  letter-spacing: .03em;
+  color: rgba(255, 255, 255, .72);
+  text-decoration: none;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, .95), 0 1px 3px rgba(0, 0, 0, .9);
+}
+
+.cprivacy:hover {
+  color: var(--butter);
+}
+
+/* consent line under each form's submit button */
+.sheet .form-note {
+  margin-top: 12px;
+  font-size: 12px;
+  line-height: 1.5;
+  color: #6c645c;
+}
+
+.sheet .form-note a {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: var(--persimmon);
+  text-decoration-thickness: 2px;
+  text-underline-offset: 2px;
+}

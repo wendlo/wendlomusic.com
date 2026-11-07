@@ -8,16 +8,23 @@
  * the co-located ContactIsland client island. The room stays a server
  * component that just lays out the static shell and hands the content slice
  * to the island.
+ *
+ * It also resolves a REACHABLE fallback address (lib/contactEmail — MX lookup,
+ * server-only) from contact.bookingEmail. That address is used ONLY in the
+ * form's "not connected" / "something broke" messages; the card's visible
+ * "or email us at …" line stays exactly what the content says.
  */
 
 import type { ContactPage } from '@/lib/content/types';
+import { resolveReachableEmail } from '@/lib/contactEmail';
 import { ContactIsland } from './_client/ContactIsland';
 
 export interface ContactRoomProps {
   contact: ContactPage;
 }
 
-export function ContactRoom({ contact }: ContactRoomProps) {
+export async function ContactRoom({ contact }: ContactRoomProps) {
+  const fallbackEmail = await resolveReachableEmail(contact.bookingEmail);
   return (
     <section className="room" data-page="contact">
       <div className="bg" />
@@ -27,7 +34,7 @@ export function ContactRoom({ contact }: ContactRoomProps) {
         src={contact.polaroids.url}
         alt="Wendlo polaroids"
       />
-      <ContactIsland contact={contact} />
+      <ContactIsland contact={contact} fallbackEmail={fallbackEmail} />
     </section>
   );
 }

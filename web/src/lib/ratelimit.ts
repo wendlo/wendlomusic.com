@@ -20,8 +20,11 @@ interface UpstashResult {
 const KV_TIMEOUT_MS = 3000;
 
 function kvEnv(): { url: string; token: string } | null {
-  const url = process.env.KV_REST_API_URL?.trim();
-  const token = process.env.KV_REST_API_TOKEN?.trim();
+  // Vercel's Upstash integration names these KV_* by default; Upstash's own
+  // dashboard / a custom prefix yields UPSTASH_REDIS_REST_* — accept either.
+  const clean = (v?: string) => v?.trim().replace(/^['"]+|['"]+$/g, '') || undefined;
+  const url = clean(process.env.KV_REST_API_URL) ?? clean(process.env.UPSTASH_REDIS_REST_URL);
+  const token = clean(process.env.KV_REST_API_TOKEN) ?? clean(process.env.UPSTASH_REDIS_REST_TOKEN);
   return url && token ? { url, token } : null;
 }
 

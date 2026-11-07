@@ -84,6 +84,9 @@ export function StoreIsland({ shopify, products }: StoreIslandProps) {
   useEffect(() => {
     try {
       const raw = localStorage.getItem(CART_KEY);
+      // Intentional post-hydration read: a lazy useState initializer would
+      // make the client's first render differ from the server's (empty cart).
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       if (raw) setCart(JSON.parse(raw) as CartLine[]);
     } catch {
       /* ignore malformed cart */

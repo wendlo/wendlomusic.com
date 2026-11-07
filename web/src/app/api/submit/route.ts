@@ -210,12 +210,15 @@ interface MailchimpConfig {
 }
 
 function mailchimpConfig(env: ServerEnv): MailchimpConfig | null {
-  if (!env.mailchimpApiKey || !env.mailchimpServerPrefix || !env.mailchimpAudienceId) {
-    return null;
-  }
+  if (!env.mailchimpApiKey || !env.mailchimpAudienceId) return null;
+  // Mailchimp keys end in "-<datacenter>" (e.g. "…-us21"), which is the API
+  // host prefix — so MAILCHIMP_SERVER_PREFIX is optional and only overrides.
+  const derived = env.mailchimpApiKey.match(/-([a-z]+\d+)$/i)?.[1];
+  const serverPrefix = (env.mailchimpServerPrefix || derived)?.toLowerCase();
+  if (!serverPrefix || !/^[a-z]+\d+$/.test(serverPrefix)) return null;
   return {
     apiKey: env.mailchimpApiKey,
-    serverPrefix: env.mailchimpServerPrefix,
+    serverPrefix,
     audienceId: env.mailchimpAudienceId,
   };
 }

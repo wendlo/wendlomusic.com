@@ -15,9 +15,9 @@
  *     returns the Storefront checkoutUrl for window.open(). Token defaults to
  *     the public constant so it works from the browser with no env setup.
  *
- * All config reads env with a code default to the PUBLIC (browser-safe) tokens,
- * matching the prototype — the integration works with no .env, overridable
- * later by env / Sanity connectionSettings.
+ * Domain + token read env with a code default to the PUBLIC (browser-safe)
+ * values, matching the prototype — the integration works with no .env. The API
+ * version is NOT configurable: see SHOPIFY_STOREFRONT_API_VERSION.
  */
 
 import { env } from '@/lib/env';
@@ -25,12 +25,38 @@ import { env } from '@/lib/env';
 /* ---- public defaults (safe to ship in client code; prototype does) ---- */
 const DEFAULT_DOMAIN = 'fep1gx-a1.myshopify.com';
 const DEFAULT_TOKEN = '13038a835c47c3e30b20f34cd745adfc';
-const DEFAULT_API_VERSION = '2024-10';
+
+/**
+ * Storefront API version — PINNED IN CODE, deliberately NOT read from env.
+ *
+ * The version is coupled to PRODUCTS_QUERY / CART_CREATE_MUTATION below, so it
+ * moves only together with them. NEXT_PUBLIC_SHOPIFY_API_VERSION is IGNORED
+ * (a stale `2024-10` value on Vercel must never win). Both getProducts()
+ * (server) and createCart() (client) use this constant.
+ *
+ * Pinned 2026-11-07 to 2026-10: the newest version the store echoed back
+ * unchanged in the `x-shopify-api-version` response header; both queries
+ * returned zero GraphQL errors on it.
+ *
+ * HOW TO BUMP (Shopify releases quarterly — YYYY-01/04/07/10 — and supports
+ * each for ~12 months, so check about every 9 months, next by ~2027-07):
+ *   1. POST {"query":"{shop{name}}"} to
+ *      https://<domain>/api/<candidate>/graphql.json and read the
+ *      `x-shopify-api-version` response header. Supported ONLY if it echoes
+ *      the candidate unchanged (an unsupported version is silently served as
+ *      a different one).
+ *   2. Run PRODUCTS_QUERY and CART_CREATE_MUTATION verbatim against the
+ *      candidate; confirm no `errors`, products + variants come back, and
+ *      cartCreate returns a checkoutUrl. Check Shopify's Storefront changelog
+ *      for breaking changes to the fields used here.
+ *   3. Change this constant and redeploy.
+ */
+export const SHOPIFY_STOREFRONT_API_VERSION = '2026-10';
 
 const SHOPIFY = {
   domain: env.shopify.domain ?? DEFAULT_DOMAIN,
   token: env.shopify.token ?? DEFAULT_TOKEN,
-  apiVersion: env.shopify.apiVersion ?? DEFAULT_API_VERSION,
+  apiVersion: SHOPIFY_STOREFRONT_API_VERSION,
 } as const;
 
 const endpoint = (domain: string, apiVersion: string): string =>

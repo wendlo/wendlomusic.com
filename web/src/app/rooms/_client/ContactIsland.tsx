@@ -16,7 +16,11 @@
  *
  * Submit POSTs to /api/submit (MIGRATION-PLAN §6.1): kind + values +
  * turnstile token + honeypot. Loading state on the submit button; success →
- * the successText panel; failure → an inline error pointing at bookingEmail.
+ * the successText panel; failure → an inline error pointing at fallbackEmail
+ * (a REACHABLE address resolved server-side in ContactRoom — the card's own
+ * "or email us at" line still shows the content-owned bookingEmail).
+ * Each form carries a quiet consent/privacy note under its submit button, and
+ * the card has a small Privacy link (/privacy).
  * The Turnstile widget renders ONLY when NEXT_PUBLIC_TURNSTILE_SITE_KEY is
  * set — its script loads lazily when a form sheet opens; when unset the form
  * submits without a token and the server skips verification.
@@ -121,9 +125,20 @@ type SubmitStatus = 'idle' | 'sending' | 'error';
 
 export interface ContactIslandProps {
   contact: ContactPage;
+  /**
+   * Address shown ONLY in the form's fallback/error messages. Resolved
+   * server-side (lib/contactEmail) so it is never a bouncing mailbox.
+   */
+  fallbackEmail: string;
 }
 
-export function ContactIsland({ contact }: ContactIslandProps) {
+/** Quiet consent copy under each form's submit button. */
+const FORM_NOTES: Record<'message' | 'email', string> = {
+  email: "You'll get a confirmation email first. Unsubscribe anytime.",
+  message: "We'll only use this to reply to you.",
+};
+
+export function ContactIsland({ contact, fallbackEmail }: ContactIslandProps) {
   const [sheet, setSheet] = useState<SheetKind | null>(null);
   const [form, setForm] = useState<FormState>({
     values: {},
@@ -256,15 +271,15 @@ export function ContactIsland({ contact }: ContactIslandProps) {
         setStatus('error');
         setErrorText(
           json?.reason === 'unconfigured'
-            ? `This form isn't connected yet — email us at ${contact.bookingEmail}`
-            : `Something broke — email us at ${contact.bookingEmail}`,
+            ? `This form isn't connected yet — email us at ${fallbackEmail}`
+            : `Something broke — email us at ${fallbackEmail}`,
         );
       } catch {
         setStatus('error');
-        setErrorText(`Something broke — email us at ${contact.bookingEmail}`);
+        setErrorText(`Something broke — email us at ${fallbackEmail}`);
       }
     },
-    [def, form.values, sheet, status, honeypot, contact.bookingEmail],
+    [def, form.values, sheet, status, honeypot, fallbackEmail],
   );
 
   const setValue = (key: string, value: string) =>
@@ -318,6 +333,9 @@ export function ContactIsland({ contact }: ContactIslandProps) {
             {contact.licensing.email}
           </a>
         </div>
+        <a className="cprivacy" href="/privacy">
+          Privacy
+        </a>
         <div className="follow">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
@@ -437,6 +455,10 @@ export function ContactIsland({ contact }: ContactIslandProps) {
                   >
                     {status === 'sending' ? 'Sending…' : def.submitLabel}
                   </button>
+                  <p className="form-note">
+                    {FORM_NOTES[sheet === 'email' ? 'email' : 'message']}{' '}
+                    <a href="/privacy">Privacy</a>
+                  </p>
                   {status === 'error' && errorText ? (
                     <p
                       role="alert"

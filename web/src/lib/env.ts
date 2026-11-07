@@ -52,10 +52,14 @@ export interface SanityEnv {
   apiVersion?: string;
 }
 
+/**
+ * NOTE: no apiVersion here on purpose. The Storefront API version is pinned in
+ * code (SHOPIFY_STOREFRONT_API_VERSION in src/lib/shopify.ts) because it is
+ * coupled to the query code; NEXT_PUBLIC_SHOPIFY_API_VERSION is ignored.
+ */
 export interface ShopifyEnv {
   domain?: string;
   token?: string;
-  apiVersion?: string;
 }
 
 export interface BandsintownEnv {
@@ -79,7 +83,6 @@ export const env: PublicEnv = {
   shopify: {
     domain: pub(process.env.NEXT_PUBLIC_SHOPIFY_STORE_DOMAIN),
     token: pub(process.env.NEXT_PUBLIC_SHOPIFY_STOREFRONT_TOKEN),
-    apiVersion: pub(process.env.NEXT_PUBLIC_SHOPIFY_API_VERSION),
   },
   bandsintown: {
     artist: pub(process.env.NEXT_PUBLIC_BANDSINTOWN_ARTIST_ID),
