@@ -252,6 +252,30 @@ export function ContactIsland({
         return;
       }
 
+      // The server rejects a missing/used token, so don't send without one.
+      if (siteKey && !tokenRef.current) {
+        setStatus('error');
+        setErrorText(
+          window.turnstile
+            ? 'Tick “Verify you are human” above, then try again.'
+            : `The spam check didn’t load — try again in a moment, or email us at ${fallbackEmail}`,
+        );
+        return;
+      }
+
+      // Turnstile tokens are single-use (enforced server-side): after any
+      // attempt, ask the widget for a fresh one so a retry can succeed.
+      const resetWidget = () => {
+        tokenRef.current = '';
+        if (widgetIdRef.current && window.turnstile) {
+          try {
+            window.turnstile.reset(widgetIdRef.current);
+          } catch {
+            // widget already gone — the next sheet open renders a new one
+          }
+        }
+      };
+
       const kind: SubmissionKind = sheet === 'email' ? 'email' : 'contact';
       setStatus('sending');
       setErrorText('');
@@ -270,7 +294,9 @@ export function ContactIsland({
         const json = (await res.json().catch(() => null)) as {
           ok?: boolean;
           reason?: string;
+          fields?: string[];
         } | null;
+        resetWidget();
 
         if (res.ok && json?.ok) {
           setStatus('idle');
@@ -278,18 +304,30 @@ export function ContactIsland({
           return;
         }
 
+        const reason = json?.reason;
+        if (reason === 'invalid' && Array.isArray(json?.fields) && json.fields.length) {
+          const bad = json.fields;
+          setForm((s) => ({ ...s, errors: Object.fromEntries(bad.map((k) => [k, true])) }));
+        }
         setStatus('error');
         setErrorText(
-          json?.reason === 'unconfigured'
+          reason === 'unconfigured'
             ? `This form isn't connected yet — email us at ${fallbackEmail}`
-            : `Something broke — email us at ${fallbackEmail}`,
+            : reason === 'turnstile'
+              ? 'The “Verify you are human” check expired — tick it again, then try again.'
+              : reason === 'rate_limited'
+                ? 'That’s a lot of tries in a row — wait a few minutes, then try again.'
+                : reason === 'invalid'
+                  ? 'Something in the form looks off — check the highlighted fields.'
+                  : `Something broke — email us at ${fallbackEmail}`,
         );
       } catch {
+        resetWidget();
         setStatus('error');
         setErrorText(`Something broke — email us at ${fallbackEmail}`);
       }
     },
-    [def, form.values, sheet, status, honeypot, fallbackEmail],
+    [def, form.values, sheet, status, honeypot, fallbackEmail, siteKey],
   );
 
   const setValue = (key: string, value: string) =>
