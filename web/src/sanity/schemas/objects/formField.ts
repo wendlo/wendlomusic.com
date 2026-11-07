@@ -25,7 +25,7 @@ export const formField = defineType({
       type: 'string',
       readOnly: true,
       description:
-        'Read-only fixed key. Drives Sheets columns + Submissions + Mailchimp merge mapping.',
+        'Read-only fixed key. Drives Sheets columns + Submissions + Kit custom-field mapping.',
       options: {
         list: FORM_FIELD_KEYS.map((k) => ({ title: k, value: k })),
       },

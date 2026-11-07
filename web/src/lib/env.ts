@@ -102,13 +102,32 @@ export interface ServerEnv {
   googleServiceAccountEmail?: string;
   /** RAW, still `\n`-escaped; un-escape at point of use (phase-4). */
   googleServiceAccountPrivateKey?: string;
-  mailchimpApiKey?: string;
-  mailchimpServerPrefix?: string;
-  mailchimpAudienceId?: string;
+  /** Kit (formerly ConvertKit) V4 API key — NOT the V3 key. */
+  kitApiKey?: string;
+  /** Kit form id (digits only; anything else is treated as unset). */
+  kitFormId?: string;
   emailProviderApiKey?: string;
   notifyEmailTo?: string;
   notifyEmailFrom?: string;
   proxyAllowedHosts?: string;
+}
+
+/**
+ * A numeric id (e.g. a Kit form id). Anything that isn't all digits after the
+ * usual quote/whitespace cleanup is treated as unset, with a log line, rather
+ * than being sent to an API as a broken URL segment.
+ */
+function numericId(name: string, value: string | undefined): string | undefined {
+  const v = pub(value);
+  if (!v) return undefined;
+  if (!/^\d+$/.test(v)) {
+    console.warn(
+      `[env] ${name} is not a number — ignoring it (the integration is skipped). ` +
+        'Fix the value in Vercel → Settings → Environment Variables.',
+    );
+    return undefined;
+  }
+  return v;
 }
 
 /** Read the server secrets. Call only in server code (routes / RSC). */
@@ -122,9 +141,8 @@ export function serverEnv(): ServerEnv {
     googleServiceAccountPrivateKey: pub(
       process.env.GOOGLE_SERVICE_ACCOUNT_PRIVATE_KEY,
     ),
-    mailchimpApiKey: pub(process.env.MAILCHIMP_API_KEY),
-    mailchimpServerPrefix: pub(process.env.MAILCHIMP_SERVER_PREFIX),
-    mailchimpAudienceId: pub(process.env.MAILCHIMP_AUDIENCE_ID),
+    kitApiKey: pub(process.env.KIT_API_KEY),
+    kitFormId: numericId('KIT_FORM_ID', process.env.KIT_FORM_ID),
     emailProviderApiKey: pub(process.env.EMAIL_PROVIDER_API_KEY),
     notifyEmailTo: pub(process.env.NOTIFY_EMAIL_TO),
     notifyEmailFrom: pub(process.env.NOTIFY_EMAIL_FROM),

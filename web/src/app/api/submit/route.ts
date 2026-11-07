@@ -8,20 +8,23 @@
  *   b. Cloudflare Turnstile siteverify — SKIPPED when TURNSTILE_SECRET_KEY is
  *      unset; fail → 400, nothing else runs.
  *   c. Field validation (name + email required, email regex) + honeypot reject.
- *   d. Google Sheets append (service-account JWT signed with node:crypto — no
- *      googleapis dep). RECORD OF TRUTH: configured + fails → 502.
- *   e. Mailchimp upsert status 'pending' (email kind only) — skipped when
- *      Mailchimp env is unset.
+ *   d. Google Sheets append (src/lib/sheets.ts) — contacts go to the
+ *      "Messages" tab, signups to "Email signups" (tabs + headers created on
+ *      first use). RECORD OF TRUTH: configured + fails → 502.
+ *   e. Kit signup (src/lib/kit.ts, email kind only): upsert the subscriber as
+ *      UNCONFIRMED and add them to the double-opt-in form, which sends Kit's
+ *      confirmation email. Skipped when Kit env is unset. Then the signup
+ *      row's "Mailing list" cell is filled in (best-effort).
  *   f. Notify email via Resend — best-effort, never fails the request.
  *
  * DEGRADE RULE: when NO storage backend applies to this submission (no Sheets,
- * no Mailchimp [email kind], no per-kind webhook from Sanity connections) →
+ * no Kit [email kind], no per-kind webhook from Sanity connections) →
  * 503 { ok:false, reason:'unconfigured' } so the client shows the
  * booking-email fallback. Nothing here may throw out of POST, and the whole
  * request works with ZERO env configured (it degrades to the 503).
  */
 
-import { createHash, createSign } from 'node:crypto';
+import { createHash } from 'node:crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { serverEnv, type ServerEnv } from '@/lib/env';
 import { getSiteContent } from '@/lib/content';
@@ -32,7 +35,15 @@ import {
   type SubmissionKind,
   type SubmitResponseBody,
 } from '@/lib/forms';
-import { claimOnce, rateLimit } from '@/lib/ratelimit';
+import { claimOnce, rateLimit, releaseClaim } from '@/lib/ratelimit';
+import { kitConfig, kitSubscribe, type KitOutcome } from '@/lib/kit';
+import {
+  appendSubmission,
+  MAILING_LIST_STATUS,
+  setMailingListStatus,
+  sheetsConfig,
+  type SheetRowRef,
+} from '@/lib/sheets';
 
 export const runtime = 'nodejs';
 
@@ -40,6 +51,11 @@ export const runtime = 'nodejs';
 const TOTAL_BUDGET_MS = 15_000;
 /** Per-upstream-call cap inside the budget. */
 const CALL_CAP_MS = 8_000;
+/**
+ * Budget held back from the Kit step so the best-effort "Mailing list" cell
+ * update (and notify email) still get a chance before the 15s deadline.
+ */
+const AFTER_KIT_RESERVE_MS = 2_500;
 
 /* ------------------------------------------------------------------ *
  * Small helpers
@@ -60,21 +76,34 @@ async function timedFetch(
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), remaining);
   try {
-    return await fetch(url, { ...init, cache: 'no-store', signal: controller.signal });
+    const res = await fetch(url, { ...init, cache: 'no-store', signal: controller.signal });
+    // Read the body while the abort timer is still armed: a server that sends
+    // headers and then stalls the body must not outlive the budget.
+    const buf = await res.arrayBuffer();
+    const nullBody = [101, 204, 205, 304].includes(res.status);
+    return new Response(nullBody ? null : buf, {
+      status: res.status,
+      statusText: res.statusText,
+      headers: res.headers,
+    });
   } finally {
     clearTimeout(timer);
   }
 }
 
 const sha256 = (s: string): string => createHash('sha256').update(s).digest('hex');
-const md5 = (s: string): string => createHash('md5').update(s).digest('hex');
 
-const b64url = (input: Buffer | string): string =>
-  (typeof input === 'string' ? Buffer.from(input) : input)
-    .toString('base64')
-    .replace(/\+/g, '-')
-    .replace(/\//g, '_')
-    .replace(/=+$/, '');
+/** The page the form was submitted from, if the browser sent a sane Referer. */
+function referrerOf(req: NextRequest): string | undefined {
+  const ref = req.headers.get('referer');
+  if (!ref || ref.length > 500) return undefined;
+  try {
+    const u = new URL(ref);
+    return u.protocol === 'https:' || u.protocol === 'http:' ? u.toString() : undefined;
+  } catch {
+    return undefined;
+  }
+}
 
 function clientIp(req: NextRequest): string {
   const fwd = req.headers.get('x-forwarded-for');
@@ -103,157 +132,6 @@ async function verifyTurnstile(
     if (!res.ok) return false;
     const data = (await res.json()) as { success?: boolean };
     return data.success === true;
-  } catch {
-    return false;
-  }
-}
-
-/* ------------------------------------------------------------------ *
- * (d) Google Sheets append — service-account JWT via node:crypto
- * ------------------------------------------------------------------ */
-
-interface SheetsConfig {
-  sheetsId: string;
-  email: string;
-  /** PEM, already \n-un-escaped. */
-  privateKey: string;
-}
-
-function sheetsConfig(env: ServerEnv): SheetsConfig | null {
-  if (
-    !env.googleSheetsId ||
-    !env.googleServiceAccountEmail ||
-    !env.googleServiceAccountPrivateKey
-  ) {
-    return null;
-  }
-  return {
-    sheetsId: env.googleSheetsId,
-    email: env.googleServiceAccountEmail,
-    // §6.1 footgun: the env value is \n-escaped PEM — un-escape at point of use.
-    privateKey: env.googleServiceAccountPrivateKey.replace(/\\n/g, '\n'),
-  };
-}
-
-/** Sign a service-account JWT and exchange it for an OAuth access token. */
-async function googleAccessToken(cfg: SheetsConfig, deadline: number): Promise<string> {
-  const iat = Math.floor(Date.now() / 1000);
-  const header = b64url(JSON.stringify({ alg: 'RS256', typ: 'JWT' }));
-  const claims = b64url(
-    JSON.stringify({
-      iss: cfg.email,
-      scope: 'https://www.googleapis.com/auth/spreadsheets',
-      aud: 'https://oauth2.googleapis.com/token',
-      iat,
-      exp: iat + 3600,
-    }),
-  );
-  const unsigned = `${header}.${claims}`;
-  const signature = createSign('RSA-SHA256').update(unsigned).sign(cfg.privateKey);
-  const jwt = `${unsigned}.${b64url(signature)}`;
-
-  const res = await timedFetch(
-    'https://oauth2.googleapis.com/token',
-    {
-      method: 'POST',
-      body: new URLSearchParams({
-        grant_type: 'urn:ietf:params:oauth:grant-type:jwt-bearer',
-        assertion: jwt,
-      }),
-    },
-    deadline,
-  );
-  if (!res.ok) throw new Error(`google token exchange ${res.status}`);
-  const data = (await res.json()) as { access_token?: string };
-  if (!data.access_token) throw new Error('google token exchange: no access_token');
-  return data.access_token;
-}
-
-/** Append one timestamped row of ALL fields. Throws on any failure (→ 502). */
-async function appendToSheet(
-  cfg: SheetsConfig,
-  kind: SubmissionKind,
-  values: Record<string, string>,
-  deadline: number,
-): Promise<void> {
-  const token = await googleAccessToken(cfg, deadline);
-  const row: string[] = [
-    new Date().toISOString(),
-    kind,
-    ...SHEET_COLUMNS.map((k) => values[k] ?? ''),
-  ];
-  const res = await timedFetch(
-    `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(
-      cfg.sheetsId,
-    )}/values/${encodeURIComponent('A1')}:append?valueInputOption=RAW&insertDataOption=INSERT_ROWS`,
-    {
-      method: 'POST',
-      headers: {
-        Authorization: `Bearer ${token}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({ values: [row] }),
-    },
-    deadline,
-  );
-  if (!res.ok) throw new Error(`sheets append ${res.status}`);
-}
-
-/* ------------------------------------------------------------------ *
- * (e) Mailchimp upsert (email kind only)
- * ------------------------------------------------------------------ */
-
-interface MailchimpConfig {
-  apiKey: string;
-  serverPrefix: string;
-  audienceId: string;
-}
-
-function mailchimpConfig(env: ServerEnv): MailchimpConfig | null {
-  if (!env.mailchimpApiKey || !env.mailchimpAudienceId) return null;
-  // Mailchimp keys end in "-<datacenter>" (e.g. "…-us21"), which is the API
-  // host prefix — so MAILCHIMP_SERVER_PREFIX is optional and only overrides.
-  const derived = env.mailchimpApiKey.match(/-([a-z]+\d+)$/i)?.[1];
-  const serverPrefix = (env.mailchimpServerPrefix || derived)?.toLowerCase();
-  if (!serverPrefix || !/^[a-z]+\d+$/.test(serverPrefix)) return null;
-  return {
-    apiKey: env.mailchimpApiKey,
-    serverPrefix,
-    audienceId: env.mailchimpAudienceId,
-  };
-}
-
-/** Upsert the member as 'pending' (double opt-in). Returns success. */
-async function mailchimpUpsert(
-  cfg: MailchimpConfig,
-  values: Record<string, string>,
-  deadline: number,
-): Promise<boolean> {
-  try {
-    const email = values.email ?? '';
-    const hash = md5(email.toLowerCase());
-    const mergeFields: Record<string, string> = {};
-    if (values.name) mergeFields.FNAME = values.name;
-    if (values.location) mergeFields.LOCATION = values.location;
-    if (values.meal) mergeFields.MEAL = values.meal;
-
-    const res = await timedFetch(
-      `https://${cfg.serverPrefix}.api.mailchimp.com/3.0/lists/${cfg.audienceId}/members/${hash}`,
-      {
-        method: 'PUT',
-        headers: {
-          Authorization: `Basic ${Buffer.from(`anystring:${cfg.apiKey}`).toString('base64')}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email_address: email,
-          status_if_new: 'pending',
-          merge_fields: mergeFields,
-        }),
-      },
-      deadline,
-    );
-    return res.ok;
   } catch {
     return false;
   }
@@ -294,12 +172,14 @@ async function sendNotifyEmail(
   kind: SubmissionKind,
   values: Record<string, string>,
   deadline: number,
+  mailingList?: string,
 ): Promise<void> {
   if (!env.emailProviderApiKey || !env.notifyEmailTo || !env.notifyEmailFrom) return;
   try {
     const lines = SHEET_COLUMNS.filter((k) => values[k]).map(
       (k) => `${k}: ${values[k]}`,
     );
+    if (mailingList) lines.push(`mailing list: ${mailingList}`);
     await timedFetch(
       'https://api.resend.com/emails',
       {
@@ -328,6 +208,16 @@ async function sendNotifyEmail(
  * ------------------------------------------------------------------ */
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const ctx: { idemKey?: string } = {};
+  const res = await handle(req, ctx);
+  // The idempotency claim marks a submission as DONE. If it wasn't (Turnstile
+  // 400, storage 502, …) release it so the fan's retry with the same values is
+  // actually processed instead of being swallowed as a no-op 200.
+  if (ctx.idemKey && res.status !== 200) await releaseClaim(ctx.idemKey);
+  return res;
+}
+
+async function handle(req: NextRequest, ctx: { idemKey?: string }): Promise<NextResponse> {
   const deadline = Date.now() + TOTAL_BUDGET_MS;
   try {
     /* ---- parse ---- */
@@ -366,6 +256,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     const idemKey = sha256(`${kind}:${JSON.stringify(rawValues)}`);
     const firstTime = await claimOnce(`idem:${idemKey}`, 600);
     if (!firstTime) return json({ ok: true, successText }, 200);
+    ctx.idemKey = `idem:${idemKey}`;
 
     /* ---- (b) Turnstile (skip when secret unset) ---- */
     if (env.turnstileSecretKey) {
@@ -392,7 +283,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     /* ---- resolve which storage backends apply to THIS submission ---- */
     const sheets = sheetsConfig(env);
-    const mailchimp = kind === 'email' ? mailchimpConfig(env) : null;
+    const kit = kind === 'email' ? kitConfig(env) : null;
     let webhookUrl = '';
     try {
       const content = await getSiteContent();
@@ -405,17 +296,20 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
     // DEGRADE RULE: no storage backend at all → 503 'unconfigured' so the
     // client shows the booking-email fallback instead of a fake success.
-    if (!sheets && !mailchimp && !webhookUrl) {
+    if (!sheets && !kit && !webhookUrl) {
       return json({ ok: false, reason: 'unconfigured' }, 503);
     }
 
     /* ---- (d) Google Sheets — record of truth: configured + failed → 502 ---- */
+    const call = (url: string, init: RequestInit) => timedFetch(url, init, deadline);
     let recorded = false;
+    let sheetRow: SheetRowRef | null = null;
     if (sheets) {
       try {
-        await appendToSheet(sheets, kind, values, deadline);
+        sheetRow = await appendSubmission(sheets, kind, values, call);
         recorded = true;
-      } catch {
+      } catch (err) {
+        console.error(`[submit] sheets append failed: ${err instanceof Error ? err.message : err}`);
         return json({ ok: false, reason: 'storage' }, 502);
       }
     }
@@ -425,23 +319,43 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       const ok = await postWebhook(webhookUrl, kind, values, deadline);
       recorded = recorded || ok;
       // Webhook as the ONLY backend must not silently drop the submission.
-      if (!ok && !sheets && !mailchimp) {
+      if (!ok && !sheets && !kit) {
         return json({ ok: false, reason: 'storage' }, 502);
       }
     }
 
-    /* ---- (e) Mailchimp upsert — email kind only ---- */
-    if (mailchimp) {
-      const ok = await mailchimpUpsert(mailchimp, values, deadline);
-      // Mailchimp as the ONLY backend that recorded nothing → loud failure.
-      if (!ok && !recorded) {
-        return json({ ok: false, reason: 'storage' }, 502);
+    /* ---- (e) Kit signup — email kind only ---- */
+    let mailingList: string | undefined;
+    if (kind === 'email') {
+      let outcome: KitOutcome | 'not_connected' = 'not_connected';
+      if (kit) {
+        const kitCall = (url: string, init: RequestInit) =>
+          timedFetch(url, init, deadline - AFTER_KIT_RESERVE_MS);
+        const result = await kitSubscribe(
+          kit,
+          {
+            email: values.email,
+            name: values.name,
+            location: values.location,
+            meal: values.meal,
+            referrer: referrerOf(req),
+          },
+          kitCall,
+        );
+        // Kit as the ONLY backend that recorded nothing → loud failure.
+        if (!result.ok && !recorded) {
+          return json({ ok: false, reason: 'storage' }, 502);
+        }
+        outcome = result.outcome;
       }
-      recorded = recorded || ok;
+      const status = MAILING_LIST_STATUS[outcome];
+      mailingList = status;
+      // Best-effort: fill the signup row's "Mailing list" cell.
+      if (sheets && sheetRow) await setMailingListStatus(sheets, sheetRow, status, call);
     }
 
     /* ---- (f) notify email — best-effort, never fails the request ---- */
-    await sendNotifyEmail(env, kind, values, deadline);
+    await sendNotifyEmail(env, kind, values, deadline, mailingList);
 
     return json({ ok: true, successText }, 200);
   } catch {

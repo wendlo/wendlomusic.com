@@ -29,8 +29,8 @@ export const FORM_FIELD_KEYS: Record<SubmissionKind, readonly FormFieldKey[]> = 
 };
 
 /**
- * Fixed column order for the Sheets append (union of both kinds) so rows from
- * either form align in one spreadsheet.
+ * Fixed field order (union of both kinds) for the notify email's lines. The
+ * Sheet's per-tab columns live in src/lib/sheets.ts (TABS).
  */
 export const SHEET_COLUMNS: readonly FormFieldKey[] = [
   'name',

@@ -3,9 +3,15 @@
  *
  * EVERY claim here is backed by code — keep them in lock-step:
  *   - form fields ............ src/lib/forms.ts (FORM_FIELD_KEYS, SHEET_COLUMNS)
- *   - where submissions go ... src/app/api/submit/route.ts (Sheets, Mailchimp
- *                              'pending' double opt-in [email list only],
- *                              Resend notify, Turnstile, Upstash)
+ *   - where submissions go ... src/app/api/submit/route.ts (Sheets [separate
+ *                              tabs for messages and sign-ups; sign-ups get a
+ *                              "Mailing list" status column, values in
+ *                              sheets.ts MAILING_LIST_STATUS], Kit (src/lib/kit.ts)
+ *                              state 'inactive' + double-opt-in form [email
+ *                              list only; name, email, location, meal, signup
+ *                              page URL (Referer) — never the message], Resend
+ *                              notify [+ the same mailing-list status line],
+ *                              Turnstile, Upstash)
  *   - rate-limit storage ..... src/lib/ratelimit.ts + the keys/TTLs in route.ts
  *   - cart / checkout ........ src/app/rooms/_client/StoreIsland.tsx, src/lib/shopify.ts
  *   - video embeds ........... src/app/rooms/MusicRoom.tsx (youtube-nocookie.com)
@@ -83,7 +89,8 @@ export default async function PrivacyPage() {
             </li>
             <li>
               The email list is opt-in twice: you’ll get a confirmation email
-              before you’re added, and every email has an unsubscribe link.
+              first, we can’t email you until you click the link in it, and
+              every email has an unsubscribe link.
             </li>
             <li>No analytics, no ad trackers, and we don’t sell your data.</li>
             <li>
@@ -186,24 +193,34 @@ export default async function PrivacyPage() {
 
             <dt>Google (Google Sheets and Gmail)</dt>
             <dd>
-              Google Sheets is our record of every form submission: the date and
-              time, which form you used, and everything you filled in. Our email
+              Google Sheets is our record of every form submission, kept in our
+              own private spreadsheet. Messages and email-list sign-ups go on
+              separate tabs, and each row holds the date and time and everything
+              you filled in. Sign-up rows also have a “Mailing list” column
+              where our server notes what happened with your sign-up: that your
+              confirmation email was sent, that you were already on the list, or
+              that you weren’t added. Nothing else about you is added. Our email
               inbox is Gmail, so emails you send us — and the notification
               emails described below — are stored there.
             </dd>
 
-            <dt>Mailchimp (Intuit)</dt>
+            <dt>Kit (Kit, Inc., US)</dt>
             <dd>
               Runs the email list — <em>email-list sign-ups only</em>. It gets
-              your email address, name, where you live and your best meal (not
-              your message), sends the confirmation email, and sends our
-              newsletters.
+              your email address, name, and — if you told us — where you live
+              and your best meal (never your message), plus the web address of
+              the page you signed up on. It sends the confirmation
+              email; until you click the link in it you’re held as an
+              unconfirmed sign-up and won’t get our emails. After that it sends
+              our newsletters. Kit is based in the US and acts as our processor
+              under its data processing agreement.
             </dd>
 
             <dt>Resend</dt>
             <dd>
               Sends us a notification email for each form submission (either
-              form) containing what you filled in, with your email address as
+              form) containing what you filled in (for sign-ups, also the same
+              “Mailing list” note as in our spreadsheet), with your email address as
               the reply-to so we can reply straight to you. Resend keeps a copy
               in its sending logs for a limited time.
             </dd>
@@ -299,7 +316,11 @@ export default async function PrivacyPage() {
             stored or processed in the United States. Where it leaves the UK or
             EU, we rely on the safeguards those companies provide for that,
             such as the EU–US Data Privacy Framework and its UK extension, or
-            the standard contractual clauses approved by the UK and EU.
+            the standard contractual clauses approved by the UK and EU. For
+            example, Kit (our email list) relies on the Data Privacy Framework
+            (including its UK extension), backed where needed by the EU’s
+            standard contractual clauses and the UK’s International Data
+            Transfer Agreement.
           </p>
         </section>
 
@@ -312,9 +333,14 @@ export default async function PrivacyPage() {
             </li>
             <li>
               <strong>Email list:</strong> until you unsubscribe or ask us to
-              delete it. If you unsubscribe, Mailchimp keeps your address marked
-              as unsubscribed so you aren’t emailed again — ask us if you’d
-              rather it was deleted completely.
+              delete it. If you unsubscribe, Kit keeps your subscriber record
+              (your address, the details above and a history of the emails we
+              sent you) marked as unsubscribed so you aren’t emailed again — ask
+              us if you’d rather it was deleted completely. If you never click
+              the confirmation link, your sign-up may stay in Kit as
+              unconfirmed (we can’t email you) until we delete it — just ask.
+              Unsubscribing doesn’t remove your sign-up row from our Google
+              Sheet; that stays until you ask us to delete it.
             </li>
             <li>
               <strong>Spam-limit data:</strong> deleted automatically within

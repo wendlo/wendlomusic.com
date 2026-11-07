@@ -108,3 +108,8 @@ export async function claimOnce(key: string, ttlSec: number): Promise<boolean> {
   if (!r || r.error) return true;
   return r.result === 'OK'; // null result → key existed → replay
 }
+
+/** Undo a claimOnce (e.g. the claimed work failed). Never throws; no-op without KV. */
+export async function releaseClaim(key: string): Promise<void> {
+  await pipeline([['DEL', `once:${key}`]]);
+}
