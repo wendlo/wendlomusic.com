@@ -103,13 +103,12 @@ export default async function PrivacyPage() {
           <p className="pv-sign">— Wendlo</p>
         </div>
 
-        {/* TODO(owners): UK/EU GDPR Art. 13(1)(a) wants the controller's
-            legal identity — add the legal name of the person or partnership
-            behind "Wendlo" (and the country it is based in) here. */}
+        {/* UK/EU GDPR Art. 13(1)(a): the controller's legal identity. */}
         <section>
           <h2>Who we are</h2>
           <p>
-            We’re Wendlo, a band. This notice covers wendlomusic.com. We decide
+            We’re Wendlo, a band — legally, Jacob and Chelsea Hamilton, doing
+            business as Wendlo Music LLC. This notice covers wendlomusic.com. We decide
             what happens to the information you give us here, which makes us the
             “controller” under UK and EU data-protection law. You can reach us
             about anything on this page at <a href={mailto}>{email}</a>.
