@@ -84,6 +84,11 @@
   height: clamp(38px, 5vw, 60px);
 }
 
+.email-cta,
+.clickhere {
+  --cta-font: clamp(15px, 1.8vw, 22px);
+}
+
 .email-cta {
   position: absolute;
   right: 13.4%;
@@ -93,7 +98,7 @@
   color: #fff;
   text-decoration: none;
   font-weight: 700;
-  font-size: clamp(15px, 1.8vw, 22px);
+  font-size: var(--cta-font);
   letter-spacing: .01em;
   white-space: nowrap;
   text-shadow: 0 2px 12px rgba(0, 0, 0, .65);
@@ -108,7 +113,9 @@
 
 .clickhere {
   position: absolute;
-  right: 33.2%;
+  /* pinned to the CTA's left edge so the gap is the same at every width:
+     "join our email list!" is 9.6em wide in this font, plus a 0.7em gap */
+  right: calc(13.4% + 10.3 * var(--cta-font));
   top: 60.2%;
   width: clamp(75px, 8vw, 110px);
   z-index: 30;
