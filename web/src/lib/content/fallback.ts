@@ -11,18 +11,32 @@
  * URL is inlined here directly.
  */
 
+// Relative (not '@/…') so scripts/seed.ts can import this file under tsx.
+import { LEGACY_DOODLES } from '../doodles';
 import type {
   AboutPage,
   BlogPage,
   ContactPage,
   HomePage,
   MusicPage,
+  NavItem,
+  NavPage,
   ServiceId,
   SiteContent,
   SiteSettings,
   SongEntry,
   TourPage,
 } from './types';
+
+/** The nav entry a fixed page renders as. */
+export function pageNavItem(p: NavPage): NavItem {
+  return {
+    kind: 'page',
+    pageId: p.pageId,
+    label: p.label,
+    isTextLabel: p.isTextLabel,
+  };
+}
 
 /** Baked default asset URLs (public/ paths). */
 export const DEFAULT_ASSETS = {
@@ -63,6 +77,18 @@ function listenLinks(
   });
 }
 
+// Array order = nav order (WENDLO_DEFAULTS.pages.order); merged with
+// enabled + labels. Text-label pages are about + blog.
+const pages: NavPage[] = [
+  { pageId: 'home', enabled: true, label: 'home', isTextLabel: false },
+  { pageId: 'about', enabled: false, label: 'about', isTextLabel: true },
+  { pageId: 'tour', enabled: true, label: 'tour', isTextLabel: false },
+  { pageId: 'contact', enabled: true, label: 'contact', isTextLabel: false },
+  { pageId: 'music', enabled: true, label: 'music', isTextLabel: false },
+  { pageId: 'store', enabled: true, label: 'store', isTextLabel: false },
+  { pageId: 'blog', enabled: false, label: 'blog', isTextLabel: true },
+];
+
 const settings: SiteSettings = {
   title: 'Wendlo',
   description:
@@ -77,17 +103,8 @@ const settings: SiteSettings = {
     logo: { url: DEFAULT_ASSETS.logo },
     stripes: { url: DEFAULT_ASSETS.stripes },
   },
-  // Array order = nav order (WENDLO_DEFAULTS.pages.order); merged with
-  // enabled + labels. Text-label pages are about + blog.
-  pages: [
-    { pageId: 'home', enabled: true, label: 'home', isTextLabel: false },
-    { pageId: 'about', enabled: false, label: 'about', isTextLabel: true },
-    { pageId: 'tour', enabled: true, label: 'tour', isTextLabel: false },
-    { pageId: 'contact', enabled: true, label: 'contact', isTextLabel: false },
-    { pageId: 'music', enabled: true, label: 'music', isTextLabel: false },
-    { pageId: 'store', enabled: true, label: 'store', isTextLabel: false },
-    { pageId: 'blog', enabled: false, label: 'blog', isTextLabel: true },
-  ],
+  pages,
+  navItems: pages.filter((p) => p.enabled).map(pageNavItem),
   connections: {
     emailWebhookUrl: '',
     contactWebhookUrl: '',
@@ -110,9 +127,8 @@ const home: HomePage = {
     focalDesktop: '50% 50%',
     focalMobile: '50% 42%',
   },
-  emailCtaEnabled: true,
-  emailCtaText: 'join our email list!',
-  clickHereEnabled: true,
+  // today's "click here" GIF + "join our email list!" link
+  doodles: LEGACY_DOODLES,
 };
 
 const about: AboutPage = {

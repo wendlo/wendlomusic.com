@@ -19,6 +19,7 @@ import type {
   ServiceId,
   SocialPlatform,
 } from '@/lib/content/types';
+import type { RawDoodle, RawDoodleLink } from '@/lib/doodles';
 import type { SanityHeroValue, SanityImageValue } from './image';
 
 /* ------------------------------------------------------------------ *
@@ -37,11 +38,32 @@ export interface RawDesign {
   stripes?: SanityImageValue | null;
 }
 
+/** A fixed-page row of siteSettings.pages (`_type: 'navPage'`). */
 export interface RawNavPage {
+  _type?: string | null;
+  _key?: string | null;
   pageId?: PageId | null;
   enabled?: boolean | null;
   label?: string | null;
   isTextLabel?: boolean | null;
+}
+
+/** A band-added nav row of siteSettings.pages (`_type: 'navCustom'`). */
+export interface RawNavCustom {
+  _type: 'navCustom';
+  _key?: string | null;
+  label?: string | null;
+  image?: SanityImageValue | null;
+  imageActive?: SanityImageValue | null;
+  link?: RawDoodleLink | null;
+  enabled?: boolean | null;
+}
+
+/** siteSettings.pages mixes both row types; tell them apart by `_type`. */
+export type RawNavEntry = RawNavPage | RawNavCustom;
+
+export function isRawNavCustom(row: RawNavEntry): row is RawNavCustom {
+  return row._type === 'navCustom';
 }
 
 export interface RawGoogleForm {
@@ -67,15 +89,14 @@ export interface RawSiteSettings {
   description?: string | null;
   announcement?: RawAnnouncement | null;
   design?: RawDesign | null;
-  pages?: RawNavPage[] | null;
+  pages?: RawNavEntry[] | null;
   connections?: RawConnections | null;
 }
 
 export interface RawHomePage {
   hero?: SanityHeroValue | null;
-  emailCtaEnabled?: boolean | null;
-  emailCtaText?: string | null;
-  clickHereEnabled?: boolean | null;
+  /** null/absent = never edited (site shows LEGACY_DOODLES); [] = none */
+  doodles?: RawDoodle[] | null;
 }
 
 export interface RawAboutPage {
@@ -223,7 +244,17 @@ export const siteContentQuery = /* groq */ `{
       "logo": logo${IMAGE},
       "stripes": stripes${IMAGE}
     },
-    pages[]{ pageId, enabled, label, isTextLabel },
+    pages[]{
+      _type,
+      _key,
+      pageId,
+      enabled,
+      label,
+      isTextLabel,
+      image{ asset },
+      imageActive{ asset },
+      link
+    },
     "connections": connections{
       emailWebhookUrl,
       contactWebhookUrl,
@@ -234,9 +265,7 @@ export const siteContentQuery = /* groq */ `{
   },
   "home": *[_id == "homePage"][0]{
     "hero": hero${HERO},
-    emailCtaEnabled,
-    emailCtaText,
-    clickHereEnabled
+    doodles[]{ _key, _type, image{ asset }, alt, text, color, shadow, link, desktop, phone }
   },
   "about": *[_id == "aboutPage"][0]{
     "hero": hero${HERO},

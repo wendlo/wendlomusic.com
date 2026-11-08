@@ -7,7 +7,8 @@
  * Ports the prototype's renderContact() + openSheet()/openGoogleForm()/
  * onFormSubmit() behavior:
  *  - message & email buttons (each label + sub) open the sheet with the
- *    matching form definition.
+ *    matching form definition; so does an OPEN_SHEET_EVENT window event
+ *    (home doodles / custom nav items, dispatched by the Shell).
  *  - optional Google-Form CTA (only when googleForm.enabled && url) opens the
  *    sheet with the embedded iframe.
  *  - socials row (enabled + url only), mapped to Tabler brand icons.
@@ -32,6 +33,7 @@ import type {
   ContactPage,
   SocialPlatform,
 } from '@/lib/content/types';
+import { OPEN_SHEET_EVENT, type OpenSheetDetail } from '@/lib/doodles';
 import { HONEYPOT_FIELD, type SubmissionKind } from '@/lib/forms';
 
 /** prototype SOCIAL_ICONS map (platform → Tabler icon class). */
@@ -172,6 +174,20 @@ export function ContactIsland({
   }, []);
 
   const closeSheet = useCallback(() => setSheet(null), []);
+
+  // Home doodles / custom nav items ask for a form sheet via a window event
+  // (the Shell slides here first). Ignore it when that form has no fields.
+  const { emailForm, messageForm } = contact;
+  useEffect(() => {
+    const onOpen = (e: Event) => {
+      const kind = (e as CustomEvent<OpenSheetDetail>).detail;
+      const target =
+        kind === 'email' ? emailForm : kind === 'message' ? messageForm : null;
+      if (target && target.fields.length > 0) openSheet(kind);
+    };
+    window.addEventListener(OPEN_SHEET_EVENT, onOpen);
+    return () => window.removeEventListener(OPEN_SHEET_EVENT, onOpen);
+  }, [emailForm, messageForm, openSheet]);
 
   const def: ContactForm | null =
     sheet === 'message'

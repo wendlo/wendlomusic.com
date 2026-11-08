@@ -19,11 +19,12 @@
 import type { Metadata } from 'next';
 import { draftMode } from 'next/headers';
 import localFont from 'next/font/local';
-import { VisualEditing } from 'next-sanity/visual-editing';
 import { getSiteContent } from '@/lib/content';
+import PreviewVisualEditing from '@/components/PreviewVisualEditing';
 import '@/styles/tokens.css';
 import '@/styles/globals.css';
 import '@/styles/rooms.css';
+import '@/styles/doodles.css';
 
 const montserrat = localFont({
   variable: '--font-montserrat',
@@ -81,9 +82,10 @@ export default async function RootLayout({
   const { settings } = await getSiteContent();
   const ann = settings.announcement;
   const annOn = !!ann.enabled && !!ann.text;
-  // Sanity live preview: only mount the Visual Editing overlay inside an
-  // active draft-mode session (started via /api/draft-mode/enable). With zero
-  // env this is always false and nothing extra renders.
+  // Sanity live preview: only mount the Visual Editing overlay (which also
+  // re-renders the page on Studio edits) inside an active draft-mode session
+  // (started via /api/draft-mode/enable). With zero env this is always false
+  // and nothing extra renders.
   const { isEnabled: isPreview } = await draftMode();
 
   return (
@@ -102,7 +104,7 @@ export default async function RootLayout({
           </a>
         ) : null}
         {children}
-        {isPreview ? <VisualEditing /> : null}
+        {isPreview ? <PreviewVisualEditing /> : null}
       </body>
     </html>
   );

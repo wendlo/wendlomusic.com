@@ -11,22 +11,39 @@
  *   - `blogPost.body` arrives as Portable Text; it is serialized to the same
  *     HTML-string shape the fallback uses so `SiteContent.body: string` holds
  *     and the room renders it unchanged.
+ *   - Doodle images and custom nav art use untransformed CDN URLs built from
+ *     the asset ref (lib/doodles assetFromRef) so GIFs keep animating.
  */
 
 import type { PortableTextBlock } from '@portabletext/react';
+import {
+  LEGACY_DOODLES,
+  assetFromRef,
+  doodlesFrom,
+  linkAvailable,
+  linkFrom,
+  type SanityProject,
+} from '@/lib/doodles';
+import { SANITY_DATASET, SANITY_PROJECT_ID } from '@/lib/sanity/client';
 import { resolveHero, resolveImage } from '@/lib/sanity/image';
-import type {
-  RawContactForm,
-  RawMusicEntry,
-  RawSiteContent,
+import {
+  isRawNavCustom,
+  type RawContactForm,
+  type RawMusicEntry,
+  type RawNavCustom,
+  type RawNavEntry,
+  type RawSiteContent,
 } from '@/lib/sanity/queries';
-import { fallbackContent } from './fallback';
+import { fallbackContent, pageNavItem } from './fallback';
 import type {
   BlogPost,
   ContactForm,
   ContactPage,
   HeroImage,
   MusicEntry,
+  NavItem,
+  NavPage,
+  PageId,
   ResolvedImage,
   ServiceId,
   SiteContent,
@@ -35,6 +52,16 @@ import type {
 } from './types';
 
 const FB = fallbackContent;
+
+/** For building untransformed CDN URLs from asset refs (doodles, nav art). */
+const PROJECT: SanityProject = {
+  projectId: SANITY_PROJECT_ID ?? '',
+  dataset: SANITY_DATASET,
+};
+
+const PAGE_IDS: ReadonlySet<string> = new Set<PageId>(
+  FB.settings.pages.map((p) => p.pageId),
+);
 
 /** Coalesce a nullable to a fallback, treating null/undefined as absent. */
 function or<T>(value: T | null | undefined, fallback: T): T {
@@ -174,6 +201,92 @@ function mapForm(raw: RawContactForm | null | undefined, fb: ContactForm): Conta
   };
 }
 
+/** A custom nav row → nav item, or null when it can't render or do anything. */
+function mapNavCustom(row: RawNavCustom, index: number): NavItem | null {
+  const link = linkFrom(row.link ?? undefined);
+  if (link.kind === 'none') return null;
+  const label = (row.label ?? '').trim();
+  const image = assetFromRef(row.image?.asset?._ref, PROJECT) ?? undefined;
+  const imageActive =
+    assetFromRef(row.imageActive?.asset?._ref, PROJECT) ?? undefined;
+  if (!label && !image && !imageActive) return null;
+  return {
+    kind: 'custom',
+    key: row._key || `nav${index}`,
+    label,
+    ...(image ? { image } : {}),
+    ...(imageActive ? { imageActive } : {}),
+    link,
+  };
+}
+
+/**
+ * siteSettings.pages holds fixed `navPage` rows AND band-added `navCustom`
+ * rows. Only fixed rows become `pages` (they drive the rooms); every enabled
+ * row becomes a `navItem`, in array order — except custom items whose target
+ * is switched off (a hidden page, or a form while Contact is hidden), which
+ * would do nothing. Filtered after the loop: custom rows can come before the
+ * fixed rows that decide what's enabled.
+ */
+function mapNav(
+  rows: RawNavEntry[] | null | undefined,
+): { pages: NavPage[]; navItems: NavItem[] } {
+  const result = mapNavRows(rows);
+  const enabled = result.pages.filter((p) => p.enabled).map((p) => p.pageId);
+  return {
+    pages: result.pages,
+    navItems: result.navItems.filter(
+      (item) => item.kind !== 'custom' || linkAvailable(item.link, enabled),
+    ),
+  };
+}
+
+function mapNavRows(
+  rows: RawNavEntry[] | null | undefined,
+): { pages: NavPage[]; navItems: NavItem[] } {
+  const pages: NavPage[] = [];
+  const navItems: NavItem[] = [];
+  const custom: NavItem[] = [];
+  const seen = new Set<PageId>();
+  let fixedIndex = 0;
+
+  for (const [i, row] of (rows ?? []).entries()) {
+    if (isRawNavCustom(row)) {
+      const item = or(row.enabled, true) ? mapNavCustom(row, i) : null;
+      if (item) {
+        navItems.push(item);
+        custom.push(item);
+      }
+      continue;
+    }
+    if (row._type && row._type !== 'navPage') continue;
+    // A missing pageId is filled by position among the FIXED rows only.
+    const pageId = or(
+      row.pageId,
+      FB.settings.pages[fixedIndex]?.pageId ?? 'home',
+    );
+    fixedIndex++;
+    if (!PAGE_IDS.has(pageId) || seen.has(pageId)) continue;
+    seen.add(pageId);
+    const page: NavPage = {
+      pageId,
+      enabled: or(row.enabled, true),
+      label: or(row.label, ''),
+      isTextLabel: or(row.isTextLabel, false),
+    };
+    pages.push(page);
+    if (page.enabled) navItems.push(pageNavItem(page));
+  }
+
+  if (pages.length === 0) {
+    return {
+      pages: FB.settings.pages,
+      navItems: [...FB.settings.navItems, ...custom],
+    };
+  }
+  return { pages, navItems };
+}
+
 /* ---- Top-level mapper ---- */
 
 /**
@@ -189,6 +302,8 @@ export function mapSiteContent(raw: RawSiteContent): SiteContent {
   const c = raw.contact;
   const b = raw.blog;
 
+  const nav = mapNav(s?.pages);
+
   const settings: SiteContent['settings'] = {
     title: or(s?.title, FB.settings.title),
     description: or(s?.description, FB.settings.description),
@@ -202,15 +317,8 @@ export function mapSiteContent(raw: RawSiteContent): SiteContent {
       logo: image(s?.design?.logo, FB.settings.design.logo),
       stripes: image(s?.design?.stripes, FB.settings.design.stripes),
     },
-    pages:
-      s?.pages && s.pages.length > 0
-        ? s.pages.map((p, i) => ({
-            pageId: or(p.pageId, FB.settings.pages[i]?.pageId ?? 'home'),
-            enabled: or(p.enabled, true),
-            label: or(p.label, ''),
-            isTextLabel: or(p.isTextLabel, false),
-          }))
-        : FB.settings.pages,
+    pages: nav.pages,
+    navItems: nav.navItems,
     connections: {
       emailWebhookUrl: or(
         s?.connections?.emailWebhookUrl,
@@ -261,11 +369,14 @@ export function mapSiteContent(raw: RawSiteContent): SiteContent {
     },
   };
 
+  // Never edited (no field yet) → today's look; an array, even empty, is the
+  // band's own layout.
+  const rawDoodles = h?.doodles;
   const home: SiteContent['home'] = {
     hero: hero(h?.hero, FB.home.hero),
-    emailCtaEnabled: or(h?.emailCtaEnabled, FB.home.emailCtaEnabled),
-    emailCtaText: or(h?.emailCtaText, FB.home.emailCtaText),
-    clickHereEnabled: or(h?.clickHereEnabled, FB.home.clickHereEnabled),
+    doodles: Array.isArray(rawDoodles)
+      ? doodlesFrom(rawDoodles, PROJECT)
+      : LEGACY_DOODLES,
   };
 
   const about: SiteContent['about'] = {

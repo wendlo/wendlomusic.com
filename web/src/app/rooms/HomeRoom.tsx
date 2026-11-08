@@ -9,15 +9,11 @@
  * background image + `--focal`/`--focal-m` focal custom properties.
  *
  * The floating chrome that appears over the home slide — the handwritten logo
- * (top-left), the rotated "join our email list!" email CTA, and the
- * /click-here-white.gif arrow — all live in the Shell (they float over the
- * whole stage and are hidden off-home via CSS: `.stage:not(.at-home) …`), NOT
- * inside this room. See prototype markup lines 353-355 (siblings of `.track`,
- * not children of the home `.room`).
- *
- * The email-CTA click behaviour (navigate to contact + open the email modal)
- * is exposed as a reusable hook in ./_client/HomeIsland for the Shell/Phase-4
- * wiring — see `useEmailCtaAction`.
+ * (top-left) and the band-placed doodles (homePage.doodles: today the "join
+ * our email list!" link + the /click-here-white.gif arrow) — lives in the
+ * Shell (it floats over the whole stage and is hidden off-home via CSS:
+ * `.stage:not(.at-home) …`), NOT inside this room. Doodle clicks are handled
+ * there too (Shell followLink → slide + OPEN_SHEET_EVENT).
  */
 
 import type { HomePage } from '@/lib/content/types';

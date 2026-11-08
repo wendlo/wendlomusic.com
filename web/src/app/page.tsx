@@ -35,7 +35,12 @@ export default async function Home() {
   };
 
   return (
-    <Shell pages={settings.pages} design={settings.design}>
+    <Shell
+      pages={settings.pages}
+      navItems={settings.navItems}
+      doodles={home.doodles}
+      design={settings.design}
+    >
       {settings.pages
         .filter((p) => p.enabled)
         .map((p) => (

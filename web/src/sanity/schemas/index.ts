@@ -31,6 +31,11 @@ import { licensing } from './objects/licensing';
 import { socialLink } from './objects/socialLink';
 import { contactForm } from './objects/contactForm';
 import { formField } from './objects/formField';
+import { doodleLink } from './objects/doodleLink';
+import { doodlePlacement } from './objects/doodlePlacement';
+import { doodleImage } from './objects/doodleImage';
+import { doodleText } from './objects/doodleText';
+import { navCustom } from './objects/navCustom';
 
 export const schemaTypes: SchemaTypeDefinition[] = [
   // Documents
@@ -59,4 +64,9 @@ export const schemaTypes: SchemaTypeDefinition[] = [
   socialLink,
   contactForm,
   formField,
+  doodleLink,
+  doodlePlacement,
+  doodleImage,
+  doodleText,
+  navCustom,
 ];

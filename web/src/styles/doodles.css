@@ -1,0 +1,148 @@
+/* =========================================================
+   Home-page doodles (src/lib/doodles.ts, components/doodles/DoodleLayer.tsx)
+
+   The layer is the stage (capped at 1920px wide, centred) and a size
+   container, so every item — image width, text size, position — is a share
+   of the layer: the whole composition scales as one picture and the gaps
+   between items never drift. The Studio editor renders the same markup inside
+   a canvas of the same aspect ratio, so it matches the site exactly.
+
+   Per item (inline custom properties, see doodleVars()):
+     --dx --dy  centre, % of layer width / height   (desktop)
+     --dw       image width or font-size, % of layer width (cqw)
+     --dr       rotation, degrees
+     --mx --my --mw --mr                             (phone)
+
+   Sizes use --u (one "cqw"). The phone layout caps it at the widest phone
+   (430px wide) so upright tablets, which also get the phone layout, keep
+   phone-sized doodles instead of doubling them next to the fixed-size logo
+   and nav. Set --du (e.g. min(1cqw, 14.4px)) to cap desktop growth past
+   1440px the same way. The editor canvas renders at exactly 1440 / 390 wide,
+   below both caps, so it is unaffected.
+   ========================================================= */
+
+.doodles {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  width: min(100%, 1920px);
+  transform: translateX(-50%);
+  container-type: size;
+  pointer-events: none;
+  z-index: 30;
+  transition: opacity .4s var(--ease), visibility 0s;
+}
+
+/* site: home only (fades like the old CTA did). visibility kicks in after the
+   fade, so off-home links leave the tab order and the accessibility tree. */
+.stage:not(.at-home) .doodles {
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity .4s var(--ease), visibility 0s linear .4s;
+}
+
+.stage:not(.at-home) .doodles .doodle {
+  pointer-events: none;
+}
+
+.doodle {
+  --x: var(--dx);
+  --y: var(--dy);
+  --w: var(--dw);
+  --r: var(--dr);
+  --u: var(--du, 1cqw);
+  position: absolute;
+  left: calc(var(--x) * 1%);
+  top: calc(var(--y) * 1%);
+  transform: translate(-50%, -50%) rotate(calc(var(--r) * 1deg));
+  pointer-events: auto;
+  display: block;
+}
+
+.doodle--image {
+  width: calc(var(--w) * var(--u));
+  aspect-ratio: var(--ar, auto);
+}
+
+.doodle--image img {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+
+.doodle--shadow.doodle--image img {
+  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, .45));
+}
+
+.doodle--text {
+  font-family: var(--nav-font);
+  font-weight: 700;
+  font-size: calc(var(--w) * var(--u));
+  line-height: normal;
+  letter-spacing: .01em;
+  white-space: nowrap;
+  color: var(--c, #fff);
+  text-decoration: none;
+  transition: color .25s;
+}
+
+.doodle--shadow.doodle--text {
+  text-shadow: 0 2px 12px rgba(0, 0, 0, .65);
+}
+
+a.doodle--text:hover {
+  color: var(--butter);
+  text-decoration: underline;
+}
+
+a.doodle {
+  cursor: pointer;
+}
+
+/* desktop: hide items marked hidden on desktop */
+.doodles .doodle.hide-desktop {
+  display: none;
+}
+
+/* phone placement — site: the same queries as the phone layout in rooms.css */
+@media (max-width:640px), (max-width:899px) and (orientation:portrait) {
+  .doodles[data-device=auto] .doodle {
+    --x: var(--mx);
+    --y: var(--my);
+    --w: var(--mw);
+    --r: var(--mr);
+    --u: min(1cqw, 4.3px);
+  }
+
+  .doodles[data-device=auto] .doodle.hide-desktop {
+    display: block;
+  }
+
+  .doodles[data-device=auto] .doodle.hide-phone {
+    display: none;
+  }
+}
+
+/* phone placement — editor canvas: chosen explicitly, not by media query */
+.doodles[data-device=phone] .doodle {
+  --x: var(--mx);
+  --y: var(--my);
+  --w: var(--mw);
+  --r: var(--mr);
+  --u: min(1cqw, 4.3px);
+}
+
+.doodles[data-device=phone] .doodle.hide-desktop {
+  display: block;
+}
+
+.doodles[data-device=phone] .doodle.hide-phone {
+  display: none;
+}
+
+.doodles[data-device=desktop] .doodle.hide-phone:not(.hide-desktop) {
+  display: block;
+}

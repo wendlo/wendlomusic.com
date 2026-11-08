@@ -13,6 +13,8 @@
  * source image was empty — see lib/image.ts + lib/content/fallback.ts).
  */
 
+import type { Doodle, DoodleLink } from '@/lib/doodles';
+
 /* ------------------------------------------------------------------ *
  * Shared / primitive value objects
  * ------------------------------------------------------------------ */
@@ -110,6 +112,38 @@ export interface NavPage {
   isTextLabel: boolean;
 }
 
+/** Band-uploaded nav art: untransformed CDN URL (GIFs keep animating) + size. */
+export interface NavImage {
+  src: string;
+  width: number;
+  height: number;
+}
+
+/**
+ * One rendered nav entry, in nav order (enabled entries only). Fixed pages
+ * keep their baked art; custom items (siteSettings.pages `navCustom` rows)
+ * carry their own art or a text label and a link.
+ */
+export type NavItem =
+  | {
+      kind: 'page';
+      pageId: PageId;
+      label: string;
+      isTextLabel: boolean;
+    }
+  | {
+      kind: 'custom';
+      key: string;
+      /** may be '' when the item is image-only */
+      label: string;
+      /** normal-state art; absent → text link */
+      image?: NavImage;
+      /** art while the linked page is current; falls back to `image` */
+      imageActive?: NavImage;
+      /** never kind 'none' (such items are dropped) */
+      link: DoodleLink;
+    };
+
 /** Shopify connection (§3.23). */
 export interface ShopifySettings {
   domain: string;
@@ -145,8 +179,13 @@ export interface SiteSettings {
   description: string;
   announcement: Announcement;
   design: DesignSettings;
-  /** Single ordered array collapsing order + enabled + labels. */
+  /**
+   * The FIXED pages only (order + enabled + labels). They drive the slider
+   * rooms; custom nav items never appear here.
+   */
   pages: NavPage[];
+  /** What the nav docks render: enabled fixed pages + custom items, in order. */
+  navItems: NavItem[];
   connections: ConnectionSettings;
 }
 
@@ -156,9 +195,8 @@ export interface SiteSettings {
 
 export interface HomePage {
   hero: HeroImage;
-  emailCtaEnabled: boolean;
-  emailCtaText: string;
-  clickHereEnabled: boolean;
+  /** Images/text placed over the home hero (see lib/doodles). */
+  doodles: Doodle[];
 }
 
 /* ------------------------------------------------------------------ *

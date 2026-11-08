@@ -13,6 +13,10 @@
  *    side-vertical (top-right) on music/store/blog. GIF pages get handwriting
  *    art that ASSET-SWAPS white↔mustard on active via CSS (unaffected by accent);
  *    about/blog are text labels.
+ *    Band-added custom nav items render beside them (own art or text) and
+ *    link to a page, a contact-form sheet, or an external site.
+ *  - Home doodles (the "click here" GIF, "join our email list!" …) via the
+ *    shared <DoodleLayer>; internal doodle links go through followLink().
  *  - Mobile FAB + nav sheet (media-driven layout; JS only toggles the sheet).
  *  - Focus move + aria-live announce on room change.
  *  - Reduced-motion: an opacity fade instead of the slide.
@@ -27,10 +31,25 @@ import {
   useMemo,
   useRef,
   useState,
+  type CSSProperties,
   type ReactNode,
 } from 'react';
-import type { DesignSettings, NavPage, PageId } from '@/lib/content/types';
+import type {
+  DesignSettings,
+  NavItem,
+  NavPage,
+  PageId,
+} from '@/lib/content/types';
 import { DEFAULT_ASSETS } from '@/lib/content/fallback';
+import {
+  OPEN_SHEET_EVENT,
+  doodleHref,
+  linkAvailable,
+  type Doodle,
+  type DoodleLink,
+  type OpenSheetDetail,
+} from '@/lib/doodles';
+import { DoodleLayer } from '@/components/doodles/DoodleLayer';
 
 /** Pages whose nav dock is the vertical side dock (prototype SIDE_PAGES). */
 const SIDE_PAGES: ReadonlySet<PageId> = new Set<PageId>(['music', 'store', 'blog']);
@@ -43,9 +62,18 @@ const GIF_NAV: ReadonlySet<PageId> = new Set<PageId>([
   'store',
 ]);
 
+type CustomNavItem = Extract<NavItem, { kind: 'custom' }>;
+
 export interface ShellProps {
-  /** Ordered nav config (order + enabled + labels), from siteSettings.pages. */
+  /**
+   * The FIXED pages (order + enabled + labels), from siteSettings.pages. The
+   * slide sequence is built from these only.
+   */
   pages: NavPage[];
+  /** What the nav docks show: enabled fixed pages + custom items, in order. */
+  navItems: NavItem[];
+  /** Home-page doodles (shown over the home hero only). */
+  doodles: Doodle[];
   /** Design settings (accent injected as --persimmon; nav art is unaffected). */
   design: DesignSettings;
   /**
@@ -60,7 +88,33 @@ function pageLabel(pages: NavPage[], id: PageId): string {
   return pages.find((p) => p.pageId === id)?.label ?? id;
 }
 
-export function Shell({ pages, design, children }: ShellProps) {
+/** Accessible name for an image-only custom nav item. */
+function linkLabel(link: DoodleLink): string {
+  switch (link.kind) {
+    case 'page':
+      return link.page ?? 'home';
+    case 'email-signup':
+      return 'join our email list';
+    case 'message':
+      return 'send us a message';
+    case 'url':
+      try {
+        return new URL(link.url ?? '').hostname.replace(/^www\./, '');
+      } catch {
+        return 'link';
+      }
+    default:
+      return 'link';
+  }
+}
+
+export function Shell({
+  pages,
+  navItems,
+  doodles,
+  design,
+  children,
+}: ShellProps) {
   const stageRef = useRef<HTMLDivElement>(null);
   const trackRef = useRef<HTMLDivElement>(null);
   const liveRef = useRef<HTMLDivElement>(null);
@@ -72,11 +126,23 @@ export function Shell({ pages, design, children }: ShellProps) {
     [pages],
   );
 
+  /**
+   * Doodles live on home only, so a link to a switched-off page (or a form
+   * link while Contact is off) could only "land on home" — i.e. do nothing.
+   * Render those as plain decoration instead; placement is unchanged.
+   */
+  const liveDoodles = useMemo(
+    () =>
+      doodles.map((d) =>
+        linkAvailable(d.link, enabled) ? d : { ...d, link: { kind: 'none' as const } },
+      ),
+    [doodles, enabled],
+  );
+
   const [current, setCurrent] = useState<PageId>(() => enabled[0] ?? 'home');
   const [sheetOpen, setSheetOpen] = useState(false);
 
   const side = SIDE_PAGES.has(current);
-  const idx = Math.max(0, enabled.indexOf(current));
 
   /**
    * Core navigation. `instant` skips the slide animation (used for the initial
@@ -149,6 +215,41 @@ export function Shell({ pages, design, children }: ShellProps) {
     [go],
   );
 
+  /**
+   * Internal links from doodles + custom nav items. Links to switched-off
+   * targets were already turned into non-links (liveDoodles, mapNav), so the
+   * home fallback is only a guard; the form links slide to contact and ask
+   * ContactIsland to open that sheet (it ignores the event when the form
+   * doesn't exist).
+   */
+  const followLink = useCallback(
+    (link: DoodleLink) => {
+      const toPage = (id: PageId | undefined): PageId =>
+        id && enabled.includes(id) ? id : 'home';
+      switch (link.kind) {
+        case 'page':
+          navigate(toPage(link.page));
+          break;
+        case 'email-signup':
+        case 'message': {
+          const page = toPage('contact');
+          navigate(page);
+          if (page === 'contact') {
+            window.dispatchEvent(
+              new CustomEvent<OpenSheetDetail>(OPEN_SHEET_EVENT, {
+                detail: link.kind === 'message' ? 'message' : 'email',
+              }),
+            );
+          }
+          break;
+        }
+        default:
+          break;
+      }
+    },
+    [enabled, navigate],
+  );
+
   // ---- mount: hash is the source of truth; set initial transform w/o anim ----
   useEffect(() => {
     if (didInit.current) return;
@@ -196,8 +297,8 @@ export function Shell({ pages, design, children }: ShellProps) {
     .filter(Boolean)
     .join(' ');
 
-  /** One nav link (GIF art or text label), per prototype navLinkHtml. */
-  const NavLink = ({ p }: { p: NavPage }) => {
+  /** One fixed-page nav link (GIF art or text label), per prototype navLinkHtml. */
+  const pageLink = (p: { pageId: PageId; label: string }, key: string) => {
     const on = p.pageId === current;
     const isText = !GIF_NAV.has(p.pageId);
     const cls = ['navlink', isText ? 'text' : '', on ? 'on' : '']
@@ -205,6 +306,7 @@ export function Shell({ pages, design, children }: ShellProps) {
       .join(' ');
     return (
       <a
+        key={key}
         data-go={p.pageId}
         className={cls}
         aria-label={p.label}
@@ -220,6 +322,56 @@ export function Shell({ pages, design, children }: ShellProps) {
       </a>
     );
   };
+
+  /**
+   * One band-added nav link. Same `navlink` class so it gets the dock/sheet
+   * heights + hover; NO data-go (the CSS art selectors key off it). Art is an
+   * inline background sized by the asset's aspect ratio; no art → text link.
+   */
+  const customLink = (item: CustomNavItem, key: string) => {
+    const on = item.link.kind === 'page' && item.link.page === current;
+    const art = on
+      ? (item.imageActive ?? item.image)
+      : (item.image ?? item.imageActive);
+    const cls = ['navlink', art ? '' : 'text', on ? 'on' : '']
+      .filter(Boolean)
+      .join(' ');
+    const style: CSSProperties | undefined = art
+      ? {
+          backgroundImage: `url("${art.src}")`,
+          aspectRatio: `${art.width} / ${art.height}`,
+        }
+      : undefined;
+    const external = item.link.kind === 'url';
+    return (
+      <a
+        key={key}
+        className={cls}
+        style={style}
+        aria-label={item.label || linkLabel(item.link)}
+        aria-current={on ? 'page' : undefined}
+        href={doodleHref(item.link)}
+        {...(external ? { target: '_blank', rel: 'noopener noreferrer' } : {})}
+        onClick={(e) => {
+          if (external) {
+            setSheetOpen(false);
+            return;
+          }
+          e.preventDefault();
+          followLink(item.link);
+        }}
+      >
+        {art ? null : item.label}
+      </a>
+    );
+  };
+
+  const navLinks = (prefix: string) =>
+    navItems.map((item) =>
+      item.kind === 'page'
+        ? pageLink(item, `${prefix}${item.pageId}`)
+        : customLink(item, `${prefix}c-${item.key}`),
+    );
 
   return (
     <div className="device">
@@ -241,35 +393,12 @@ export function Shell({ pages, design, children }: ShellProps) {
           onClick={() => navigate('home')}
         />
 
-        {/* home-only email CTA + click-here art (hidden off-home via CSS) */}
-        <a
-          className="email-cta"
-          data-go="contact"
-          href="#contact"
-          onClick={(e) => {
-            e.preventDefault();
-            navigate('contact');
-            // TODO(phase-4): also open the email sheet (data-sheet="email").
-          }}
-        >
-          join our email list!
-        </a>
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img
-          className="clickhere"
-          data-go="contact"
-          src="/click-here-white.gif"
-          alt=""
-          aria-hidden="true"
-          onClick={() => navigate('contact')}
-        />
+        {/* home-only doodles (faded out off-home via doodles.css) */}
+        <DoodleLayer items={liveDoodles} onLink={followLink} />
 
         {/* desktop nav dock (bottom on home/about/tour/contact, side on music/store/blog) */}
         <nav className={`nav ${side ? 'side' : 'bottom'}`} aria-label="Sections">
-          {enabled.map((id) => {
-            const p = pages.find((x) => x.pageId === id)!;
-            return <NavLink key={id} p={p} />;
-          })}
+          {navLinks('')}
         </nav>
 
         {/* the slider */}
@@ -296,10 +425,7 @@ export function Shell({ pages, design, children }: ShellProps) {
           >
             &times;
           </button>
-          {enabled.map((id) => {
-            const p = pages.find((x) => x.pageId === id)!;
-            return <NavLink key={`m-${id}`} p={p} />;
-          })}
+          {navLinks('m-')}
         </nav>
 
         {/* aria-live region for room-change announcements */}

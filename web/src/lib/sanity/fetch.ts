@@ -3,8 +3,9 @@
  *
  * Two modes, decided per request:
  *  - PREVIEW: when Next draft mode is enabled AND `SANITY_API_READ_TOKEN` is
- *    set, reads go through a token'd client with `perspective: 'previewDrafts'`
- *    and no caching, so editors see unpublished drafts live (Presentation
+ *    set, reads go through a token'd client with no caching, in the
+ *    perspective picked in the Studio (Drafts by default, or Published, or a
+ *    release), so editors see exactly what they asked to see (Presentation
  *    tool / Visual Editing).
  *  - PUBLISHED: otherwise the shared CDN client is used with Next cache tags
  *    (`next: { tags, revalidate: false }`) — cached indefinitely until
@@ -16,7 +17,8 @@
  */
 
 import type { QueryParams } from 'next-sanity';
-import { draftMode } from 'next/headers';
+import { resolvePerspectiveFromCookies } from 'next-sanity/live';
+import { cookies, draftMode } from 'next/headers';
 import { serverEnv } from '@/lib/env';
 import { getClient } from './client';
 
@@ -48,8 +50,20 @@ export async function sanityFetch<T>(
 
   const token = serverEnv().sanityReadToken;
   if (isDraft && token) {
+    // The Studio's perspective picker lands in the sanity-preview-perspective
+    // cookie (set by the draft-mode enable route and by <VisualEditing>);
+    // 'drafts' when it's missing or invalid.
+    const perspective = await resolvePerspectiveFromCookies({ cookies: await cookies() });
     return client
-      .withConfig({ useCdn: false, token, perspective: 'previewDrafts' })
+      .withConfig({
+        useCdn: false,
+        token,
+        perspective,
+        // A release is a stacked perspective (e.g. ['rXXXX', 'drafts']), which
+        // the API only accepts from v2025-02-19; the shared client is pinned
+        // to 2024-10-01. Same query results otherwise (checked on this dataset).
+        apiVersion: '2025-02-19',
+      })
       .fetch<T>(query, params, { cache: 'no-store' });
   }
 

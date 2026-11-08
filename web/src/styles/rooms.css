@@ -63,7 +63,7 @@
   background: linear-gradient(to right, rgba(0, 0, 0, .7) 0%, rgba(0, 0, 0, .18) 45%, transparent 72%);
 }
 
-/* ---------- logo / email cta ---------- */
+/* ---------- logo (the home email CTA + click-here art are doodles: doodles.css) ---------- */
 .logo {
   position: absolute;
   top: 3.6%;
@@ -82,56 +82,6 @@
 
 .stage.content .logo {
   height: clamp(38px, 5vw, 60px);
-}
-
-.email-cta,
-.clickhere {
-  --cta-font: clamp(15px, 1.8vw, 22px);
-}
-
-.email-cta {
-  position: absolute;
-  right: 13.4%;
-  top: 62.8%;
-  transform: rotate(-4deg);
-  z-index: 31;
-  color: #fff;
-  text-decoration: none;
-  font-weight: 700;
-  font-size: var(--cta-font);
-  letter-spacing: .01em;
-  white-space: nowrap;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, .65);
-  cursor: pointer;
-  transition: opacity .4s var(--ease), color .25s;
-}
-
-.email-cta:hover {
-  color: var(--butter);
-  text-decoration: underline;
-}
-
-.clickhere {
-  position: absolute;
-  /* pinned to the CTA's left edge so the gap is the same at every width:
-     "join our email list!" is 9.6em wide in this font, plus a 0.7em gap */
-  right: calc(13.4% + 10.3 * var(--cta-font));
-  top: 60.2%;
-  width: clamp(75px, 8vw, 110px);
-  z-index: 30;
-  transform: rotate(-3deg);
-  filter: drop-shadow(0 2px 10px rgba(0, 0, 0, .45));
-  pointer-events: auto;
-  cursor: pointer;
-  transition: opacity .4s var(--ease);
-}
-
-.stage:not(.at-home) .email-cta,
-.stage:not(.at-home) .clickhere,
-.email-cta.off,
-.clickhere.off {
-  opacity: 0;
-  pointer-events: none;
 }
 
 /* ---------- nav dock ---------- */
@@ -1659,10 +1609,8 @@
 
 @media (max-width:640px) {
 
-  /* on mobile the desktop nav dock + home CTAs are hidden; the FAB drives nav */
-  .nav,
-  .email-cta,
-  .clickhere {
+  /* on mobile the desktop nav dock is hidden; the FAB drives nav */
+  .nav {
     display: none;
   }
 
@@ -1705,7 +1653,7 @@
     pointer-events: auto;
   }
 
-  /* mobile HOME: show the full nav (vertical stack, thumb side) + email CTA; hide the FAB */
+  /* mobile HOME: show the full nav (vertical stack, thumb side); hide the FAB */
   .stage.at-home .nav {
     display: flex;
     top: auto;
@@ -1726,13 +1674,6 @@
 
   .stage.at-home .mnav-btn {
     display: none;
-  }
-
-  .stage.at-home .email-cta {
-    display: block;
-    right: 7%;
-    top: 15%;
-    font-size: 15.5px;
   }
 
   /* mobile layout overrides */
@@ -1875,9 +1816,7 @@
 
 @media (max-width:899px) and (orientation:portrait) {
 
-  .nav,
-  .email-cta,
-  .clickhere {
+  .nav {
     display: none;
   }
 
@@ -1940,13 +1879,6 @@
 
   .stage.at-home .mnav-btn {
     display: none;
-  }
-
-  .stage.at-home .email-cta {
-    display: block;
-    right: 7%;
-    top: 15%;
-    font-size: 15.5px;
   }
 
   .logo {

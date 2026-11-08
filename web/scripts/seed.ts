@@ -9,8 +9,10 @@
  *   npx tsx scripts/seed.ts
  *
  * It upserts the 7 singletons (siteSettings + 6 page docs), the song/youtube
- * entries, socials, and form definitions, plus the sample blog post — uploading
- * the /public/seed art + /public/defaults hero images as Sanity image assets.
+ * entries, socials, form definitions and the home doodles (today's "click
+ * here" GIF + "join our email list!"), plus the sample blog post — uploading
+ * the /public/seed art, /public/defaults heroes and the click-here GIF as
+ * Sanity image assets.
  *
  * `@sanity/block-tools` is NOT installed here, so the blog body is written as
  * simple Portable Text blocks (parsed from the fallback's raw HTML).
@@ -26,6 +28,7 @@ import type {
   SocialLink,
   SongEntry,
 } from '../src/lib/content/types';
+import type { Doodle } from '../src/lib/doodles';
 
 /* ------------------------------------------------------------------ *
  * Config
@@ -213,7 +216,30 @@ async function siteSettingsDoc() {
   };
 }
 
+/** A site doodle → its doodleImage / doodleText array item (image uploaded). */
+async function doodleDoc(d: Doodle) {
+  const placement = (p: Doodle['desktop']) => ({ _type: 'doodlePlacement', ...p });
+  const base = {
+    _key: d._key,
+    link: { _type: 'doodleLink', ...d.link },
+    shadow: d.shadow,
+    desktop: placement(d.desktop),
+    phone: placement(d.phone),
+  };
+  if (d.kind === 'text') {
+    return { _type: 'doodleText', ...base, text: d.text, color: d.color };
+  }
+  const image = await uploadImage(d.src);
+  if (!image) return null;
+  return { _type: 'doodleImage', ...base, image, alt: d.alt };
+}
+
 async function homePageDoc() {
+  const doodles = [];
+  for (const d of FB.home.doodles) {
+    const doc = await doodleDoc(d);
+    if (doc) doodles.push(doc);
+  }
   return {
     _id: 'homePage',
     _type: 'homePage',
@@ -222,9 +248,7 @@ async function homePageDoc() {
       FB.home.hero.focalDesktop,
       FB.home.hero.focalMobile,
     ),
-    emailCtaEnabled: FB.home.emailCtaEnabled,
-    emailCtaText: FB.home.emailCtaText,
-    clickHereEnabled: FB.home.clickHereEnabled,
+    doodles,
   };
 }
 
