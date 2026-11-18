@@ -67,7 +67,9 @@ export async function generateMetadata(): Promise<Metadata> {
     metadataBase: new URL('https://wendlomusic.com'),
     title: settings.title || 'Wendlo',
     description: settings.description || '',
-    icons: { icon: '/w-tile.png' },
+    // Tab/home-screen icons come from the file conventions in src/app:
+    // favicon.ico (16/32/48, strokes thickened for small sizes), icon.png
+    // (512) and apple-icon.png (180): the band's hand-lettered WENDLO mark.
     openGraph: {
       title: settings.title || 'Wendlo',
       description: settings.description || '',
